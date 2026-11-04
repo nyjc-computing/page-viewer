@@ -105,7 +105,9 @@ code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
 /* CSS panel */
 #css-body{padding:0 0 60px;font:12px/1.55 ui-monospace,"Cascadia Mono",Consolas,monospace}
 .pv-matches{padding:7px 10px 9px;border-bottom:1px solid var(--line);background:#1e2739}
-.pv-matches h4{margin:1px 0 6px;font:600 11px system-ui;color:var(--dim);letter-spacing:.4px}
+.pv-matches-h{position:sticky;top:0;z-index:3;padding:6px 10px;background:var(--pane2);
+             border-bottom:1px solid var(--line);font:600 11px system-ui;color:var(--dim);
+             letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-matches .hint{font:11px system-ui;color:#5b6b85;margin-top:5px}
 .pv-sheet{border-bottom:1px solid var(--line)}
 .pv-sheet-h{display:flex;gap:8px;align-items:center;padding:5px 10px;background:#1d2534}
@@ -1226,7 +1228,7 @@ function modelize(rules){
         n.decls=[...r.style].map(p=>({p, v:r.style.getPropertyValue(p),
                                       imp:r.style.getPropertyPriority(p)}));
         n.spec = specOf(n.sel||'');
-        n.collapsed = n.decls.length<=1;      /* single-pair rules start collapsed */
+        n.collapsed = false;                  /* expanded by default; collapse-all or click to fold */
       }else if(typeof CSSMediaRule!=='undefined' && r instanceof CSSMediaRule){
         n.kind='media'; n.label=r.conditionText||''; n.children=walk([...r.cssRules]);
       }else if(typeof CSSSupportsRule!=='undefined' && r instanceof CSSSupportsRule){
@@ -1323,6 +1325,8 @@ const cssp = {
   render(){
     const box = $('#css-body');
     const out = [];
+    if(this.selEl) out.push('<div class="pv-matches-h">Rules matching '+esc(elLabel(this.selEl))+'</div>');
+    if(this.selEl) out.push('<div class="pv-matches">');
     if(this.selEl) this.matchedHtml(out);
     if(!this.sheets.length){
       out.push('<div class="pv-empty">No manageable stylesheet on this page.</div>');
@@ -1382,7 +1386,6 @@ const cssp = {
   matchedHtml(out){
     const el = this.selEl;
     const hits = this.matchedRules(el);
-    out.push('<div class="pv-matches"><h4>Rules matching '+esc(elLabel(el))+'</h4>');
     if(!hits.length) out.push('<div class="hint">No stylesheet rule selects this element — everything you see comes from the browser defaults.</div>');
     hits.forEach(h=>{
       const collapsed = h.node.collapsed ? ' collapsed' : '';
