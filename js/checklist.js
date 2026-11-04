@@ -18,7 +18,7 @@ const checklist = {
       g.items.forEach(([key])=>{
         const row = document.createElement('div');
         row.className='ck-item'; row.dataset.key=key;
-        row.title='Find this element on the page (or in the tree) and click it — it ticks itself';
+        row.title='View only — select the element on the page to tick it off';
         row.innerHTML = '<input type="checkbox"><code>'
           + esc(key==='doctype' ? '<!doctype html>' : key)
           + '</code><span class="n" hidden></span>';
@@ -29,16 +29,10 @@ const checklist = {
     this.container = $('#ck-body');
     this.container.append(frag);
 
-    /* checkboxes are indicators only — items tick themselves when the
-       student selects the element on the page or in the tree */
+    /* view-only: clicking anywhere in the checklist explains how ticking works */
     this.container.addEventListener('click', e=>{
-      if(e.target.type==='checkbox'){
-        e.preventDefault();
-        ckToast('Items tick themselves: find and click the matching element on the page (or in the HTML tree).');
-        return;
-      }
-      const row=e.target.closest('.ck-item'); if(!row) return;
-      this.jumpTo(row.dataset.key);
+      e.preventDefault();
+      ckToast('Items tick themselves: find and click the matching element on the page (or in the HTML tree).');
     });
     $('#btn-ck-reset').addEventListener('click', ()=>{
       this.checked.clear(); this.save(); this.updateAll();
@@ -84,27 +78,6 @@ const checklist = {
       setTimeout(()=>it.row.classList.remove('pv-flash'), 1300);
       this.scrollTo(it.row);
     }
-  },
-
-  jumpTo(key){
-    if(!state.doc){ setStatus('Load a page first — then click checklist entries to find them on it.', 'err'); return; }
-    if(key==='doctype'){
-      const root=state.doc.documentElement;
-      if(this.checked.has(key)) setStatus('The doctype is already ticked — it is the first line of the source.');
-      selectElement(root, 'checklist'); mdn.showFor('doctype');
-      return;
-    }
-    let el=null;
-    if(key.charAt(0)==='&'){
-      const dec = ENT_DEC[key];
-      const all = [...state.doc.querySelectorAll('body *')];
-      el = all.find(e=>!e.children.length && (e.textContent||'').includes(dec))
-        || all.find(e=>(e.textContent||'').includes(dec));
-    }else{
-      try{ el = state.doc.querySelector(key); }catch{}
-    }
-    if(el) selectElement(el, 'checklist');
-    else setStatus('“'+key+'” is not on this page — try another page or the sample.', 'err');
   },
 
   updateRow(row){
