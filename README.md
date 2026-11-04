@@ -1,7 +1,7 @@
 # Page Viewer
 
-A DevTools-like **DOM inspector for learning HTML and CSS** — a single-page HTML5 app in
-one dependency-free file (`index.html`).
+A DevTools-like **DOM inspector for learning HTML and CSS** — a small static site of
+plain HTML, CSS and JavaScript files. No frameworks, no build step, no dependencies.
 
 Students load a web page and see it rendered in a preview pane next to the inspector,
 which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checklist** and
@@ -33,6 +33,26 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
   page through the proxy chain, and finally to the built-in summary with an MDN link
   (MDN itself cannot be framed, so the article is always extracted or re-rendered by the
   tool).
+
+## Project structure
+
+```
+index.html          markup only; loads the stylesheet and scripts (in dependency order)
+css/styles.css      all layout and panel styling
+js/data.js          syllabus content: RefG §4 checklist, element blurbs, proxies
+js/sample.js        the built-in sample page (embedded template)
+js/util.js          shared helpers (escaping, tokens, status messages)
+js/fetch.js         direct + CORS-proxy fetch pipeline
+js/page.js          page loading: sanitising, stylesheet inlining, preview iframe wiring
+js/tree.js          tokenised DOM tree, hover/click sync, find, breadcrumb
+js/csspanel.js      CSS rule model, per-rule toggles, matched-rules view
+js/mdn.js           reference panel: local blurbs + markdown renderer for the MDN content repo
+js/checklist.js     RefG §4 checklist state and UI
+js/main.js          boot: wires everything together, splitter, help dialog
+```
+
+Scripts are plain (non-module) files loaded in the order above — cross-file references
+resolve through the shared global scope, so each file is a small, testable unit.
 
 ## Running it
 
