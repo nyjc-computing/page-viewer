@@ -176,7 +176,7 @@ function injectPageUi(doc){
     liveEl = el;
     if(el){
       el.classList.add('pv-hover');
-      chip.textContent = elLabel(el) + ' · ' + (el.offsetWidth||0) + '×' + (el.offsetHeight||0);
+      chip.textContent = '<'+el.tagName.toLowerCase()+'> ('+(el.offsetWidth||0)+'×'+(el.offsetHeight||0)+')';
       chip.style.display='block';
       /* DevTools-style translucent overlay + label pinned to the element's corner */
       const win = doc.defaultView;
