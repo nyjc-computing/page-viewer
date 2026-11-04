@@ -52,6 +52,9 @@ js/csspanel.js      CSS rule model, per-rule toggles, matched-rules view
 js/mdn.js           reference panel: local blurbs + markdown renderer for the MDN content repo
 js/checklist.js     RefG §4 checklist state and UI
 js/main.js          boot: wires everything together, splitter, help dialog
+favicon.svg,        the </> mark (SVG + PNG fallbacks)
+favicon-32.png,
+apple-touch-icon.png
 ```
 
 Scripts are plain (non-module) files loaded in the order above — cross-file references
