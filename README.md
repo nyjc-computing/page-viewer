@@ -29,16 +29,18 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
   presence badges (`×4`) show how many of each the current page contains; progress is
   saved in the browser.
 - **Reference** (bottom right) — a local summary for the selected element plus the full
-  MDN article, rendered from the MDN content repo via jsDelivr (a direct, CORS-friendly
-  source that needs no proxy); if that fails it falls back to fetching the rendered MDN
-  page through the proxy chain, and finally to the built-in summary with an MDN link
-  (MDN itself cannot be framed, so the article is always extracted or re-rendered by the
-  tool).
+  MDN article. The articles for the syllabus elements are **bundled in `content/`** and
+  loaded same-origin, so the panel works offline and on filtered school networks; if an
+  article isn't bundled it is fetched from the mdn/content repo (jsDelivr or
+  raw.githubusercontent, both CORS-friendly) and finally through the proxy chain. MDN
+  itself cannot be framed, so the article is always re-rendered by the tool.
 
 ## Project structure
 
 ```
 index.html          markup only; loads the stylesheet and scripts (in dependency order)
+content/            bundled MDN articles (Markdown) for the syllabus elements
+scripts/            update-mdn-content.py — refresh the bundled articles
 css/styles.css      all layout and panel styling
 js/data.js          syllabus content: RefG §4 checklist, element blurbs, proxies
 js/sample.js        the built-in sample page (embedded template)

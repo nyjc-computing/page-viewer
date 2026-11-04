@@ -77,12 +77,21 @@ const mdn = {
       this.err.innerHTML = 'Full MDN page unavailable right now ('+esc(trunc(e.message,110))+'). '
         +'The summary above is built in — <a href="'+esc(pageUrl)+'" target="_blank" rel="noopener">open MDN ↗</a>';
     };
-    const raw = mdnRawUrl(key);
-    const first = raw ? fetchText(raw, 10000, 1, true) : Promise.reject(new Error('no raw source'));
-    first.then(r => done(mdToHtml(r.text, pageUrl)))
-      .catch(() => fetchText(pageUrl, 15000)
-        .then(r => done(extractMdn(r.text, pageUrl)))
-        .catch(fail));
+    const slug = mdnSlug(key);
+    const sources = [];
+    if(slug){
+      sources.push([mdnLocalUrl(slug), true]);
+      sources.push([mdnRawUrl(slug, 'https://cdn.jsdelivr.net/gh/mdn/content@main/files/en-us/'), true]);
+      sources.push([mdnRawUrl(slug, 'https://raw.githubusercontent.com/mdn/content/main/files/en-us/'), true]);
+    }
+    sources.push([pageUrl, false]);
+    let chain = Promise.reject(new Error('no sources'));
+    for(const [u, direct] of sources){
+      chain = chain.catch(() => fetchText(u, direct ? 10000 : 15000, direct ? 1 : 2, direct)
+        .then(r => { const md = u.endsWith('.md'); return md ? mdToHtml(r.text, pageUrl) : extractMdn(r.text, pageUrl); })
+        .then(html => done(html)));
+    }
+    chain.catch(fail);
   },
 
   showTextHint(){
@@ -114,15 +123,21 @@ function extractMdn(htmlText, pageUrl){
     +'<style>'+MDN_CSS+'</style></head><body>'+art.innerHTML+'</body></html>';
 }
 
-/* Primary MDN source: the mdn/content repo via jsDelivr — CORS-open, fast,
-   no proxy needed. Renders the page's Markdown source. */
-function mdnRawUrl(key){
-  let slug=null;
-  if(key==='doctype') slug='glossary/doctype';
-  else if(key.charAt(0)==='&') slug='glossary/character_reference';
-  else if(/^h[1-6]$/i.test(key)) slug='web/html/reference/elements/heading_elements';
-  else if(/^[a-z0-9]+$/i.test(key)) slug='web/html/reference/elements/'+key.toLowerCase();
-  return slug ? 'https://cdn.jsdelivr.net/gh/mdn/content@main/files/en-us/'+slug+'/index.md' : null;
+/* MDN article sources, tried in order:
+   1. bundled content/ file (same-origin — works offline and on filtered school networks)
+   2. mdn/content repo via jsDelivr (CORS-open)
+   3. mdn/content repo via raw.githubusercontent (CORS-open)
+   4. the rendered MDN page through the proxy chain (last resort) */
+function mdnSlug(key){
+  if(key==='doctype') return 'glossary/doctype';
+  if(key.charAt(0)==='&') return 'glossary/character_reference';
+  if(/^h[1-6]$/i.test(key)) return 'web/html/reference/elements/heading_elements';
+  if(/^[a-z0-9-]+$/i.test(key)) return 'web/html/reference/elements/'+key.toLowerCase();
+  return null;
+}
+function mdnLocalUrl(slug){ return 'content/'+slug.split('/').join('--')+'.md'; }
+function mdnRawUrl(slug, base){
+  return base + slug + '/index.md';
 }
 
 /* Minimal Markdown renderer for MDN repo pages: front matter, macro calls,
