@@ -12,10 +12,11 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
   a DevTools-style translucent overlay over the element on the page; hovering the page
   highlights its row in the tree. **Drag the divider** between the preview and the panels
   to give more room to either side (the choice is remembered).
-- **HTML** (top left) — the raw markup as syntax-linted, collapsible rows: tag names,
-  attribute names, values and comments are colour-coded, and hovering any token shows
-  what kind of HTML syntax it is. Includes a find box (`Enter` cycles through matching
-  tags) and a breadcrumb for the selected element.
+- **HTML** (top left) — the complete raw markup, pretty-printed into collapsible rows
+  with closing tags: tag names, attribute names, values, text and comments are
+  colour-coded, and hovering any token shows what kind of HTML syntax it is. Includes a
+  find box (`Enter` cycles through matching tags) and a breadcrumb for the selected
+  element.
 - **CSS** (top right) — every stylesheet with every rule as
   `selector { declarations }` and a checkbox. Untick a rule, an `@media` group, or a
   whole stylesheet and the preview updates live. When an element is selected, the

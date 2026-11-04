@@ -16,7 +16,10 @@ let hoverApi = null;
 const TOK_TITLES = {
   tag:'Tag name', an:'Attribute name', av:'Attribute value', eq:'Equals sign',
   lt:'Angle bracket', cm:'HTML comment', tx:'Text content',
+  more:'Collapsed child nodes',
 };
+const VOID_ELEMENTS = new Set(['area','base','br','col','embed','hr','img','input',
+  'link','meta','param','source','track','wbr']);   /* no closing tag in HTML */
 function tokHtml(kind, innerHtml, extraTitle){
   const title = TOK_TITLES[kind] + (extraTitle ? ' — '+extraTitle : '');
   return '<span class="tok tok-'+kind+'" title="'+esc(title)+'">'+innerHtml+'</span>';
@@ -30,10 +33,7 @@ function attrsRaw(el){
     const bool = a.value === '';
     h += ' ' + tokHtml('an', esc(a.name), bool ? 'boolean attribute — has no value' : '');
     if(!bool){
-      const v = a.value;
-      const shown = v.length>110 ? esc(v.slice(0,110))+'…' : esc(v);
-      const extra = v.length>110 ? 'truncated — full value: '+trunc(v,300) : '';
-      h += tokHtml('eq','=') + tokHtml('av', '"'+shown+'"', extra);
+      h += tokHtml('eq','=') + tokHtml('av', '"'+esc(a.value)+'"');
     }
   }
   return h;
@@ -65,7 +65,7 @@ const tree = {
     this.expand(o); this._budget--;
     if(o.kids) for(const h of o.kids.children){
       const c = h._pv;
-      if(c && c.node.nodeType===1) this.expandAll(c);
+      if(c && c !== o && c.node.nodeType===1) this.expandAll(c);   /* skip the closing row */
     }
   },
 
@@ -86,17 +86,29 @@ const tree = {
     o.row = document.createElement('div'); o.row.className='pv-row'; o.row._pv = o;
     if(node.nodeType===1){
       const tag = esc(node.tagName.toLowerCase());
-      o.row.innerHTML = '<span class="pv-twist">'+(twistable(node)?'▸':'')+'</span>'
-        + tokHtml('lt','&lt;') + tokHtml('tag', tag) + attrsRaw(node) + tokHtml('lt','&gt;');
+      const isVoid = VOID_ELEMENTS.has(node.tagName.toLowerCase());
+      const hasKids = twistable(node);
+      let inlineClose = '';
+      if(!isVoid){
+        const closeTok = tokHtml('lt','&lt;/') + tokHtml('tag', tag) + tokHtml('lt','&gt;');
+        if(hasKids){
+          o.row.classList.add('pv-shut');
+          inlineClose = ' ' + tokHtml('more',' … ') + closeTok;
+        }else{
+          inlineClose = ' ' + closeTok;      /* empty element: <div></div> */
+        }
+      }
+      o.row.innerHTML = '<span class="pv-twist">'+(hasKids?'▸':'')+'</span>'
+        + tokHtml('lt','&lt;') + tokHtml('tag', tag) + attrsRaw(node) + tokHtml('lt','&gt;')
+        + '<span class="pv-inline-close">'+inlineClose+'</span>';
       this.el2row.set(node, o);
     }else if(node.nodeType===3){
       o.row.classList.add('pv-text');
-      o.row.innerHTML = '<span class="pv-twist"></span>'
-        + tokHtml('tx', esc(trunc(node.textContent,120)));
+      o.row.innerHTML = '<span class="pv-twist"></span>' + tokHtml('tx', esc(node.textContent));
     }else if(node.nodeType===8){
       o.row.classList.add('pv-comment');
       o.row.innerHTML = '<span class="pv-twist"></span>'
-        + tokHtml('cm', '&lt;!--'+esc(trunc(node.textContent,86))+'--&gt;');
+        + tokHtml('cm', '&lt;!--'+esc(node.textContent)+'--&gt;');
     }
     o.holder.appendChild(o.row);
     return o;
@@ -110,12 +122,23 @@ const tree = {
       if(n.nodeType===1 || n.nodeType===8 || (n.nodeType===3 && n.textContent.trim()))
         o.kids.appendChild(this.makeRow(n).holder);
     }
+    if(o.node.nodeType===1 && !VOID_ELEMENTS.has(o.node.tagName.toLowerCase())){
+      const close = document.createElement('div');
+      close.className = 'pv-row pv-close-row';
+      close._pv = o;
+      close.title = 'Closing tag';
+      close.innerHTML = '<span class="pv-twist"></span>'
+        + tokHtml('lt','&lt;/') + tokHtml('tag', esc(o.node.tagName.toLowerCase())) + tokHtml('lt','&gt;');
+      o.kids.appendChild(close);
+    }
     o.holder.appendChild(o.kids);
     o.built = true;
   },
 
-  expand(o){ if(!o.built) this.buildChildren(o); o.kids.style.display=''; o.open=true; this.twist(o,'▾'); },
-  collapse(o){ if(o.kids) o.kids.style.display='none'; o.open=false; this.twist(o,'▸'); },
+  expand(o){ if(!o.built) this.buildChildren(o); o.kids.style.display=''; o.open=true;
+             this.twist(o,'▾'); o.row.classList.remove('pv-shut'); },
+  collapse(o){ if(o.kids) o.kids.style.display='none'; o.open=false; this.twist(o,'▸');
+               if(o.node.nodeType===1 && o.built) o.row.classList.add('pv-shut'); },
   toggle(o){ o.open ? this.collapse(o) : this.expand(o); },
   twist(o,ch){ const t=o.row.querySelector('.pv-twist'); if(t) t.textContent=ch; },
 

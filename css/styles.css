@@ -79,9 +79,16 @@ code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
 .pv-row.pv-sel{background:#123a63;border-left-color:var(--acc)}
 .pv-twist{width:12px;flex:none;color:var(--dim);text-align:center;user-select:none}
 .pv-twist:hover{color:#fff}
+/* closing tags: shown as their own row when expanded, inline when collapsed */
+.pv-inline-close{display:none}
+.pv-row.pv-shut .pv-inline-close{display:inline}
+.pv-close-row{color:#6f7d94}
+.pv-close-row .tok-tag{color:#79c0ff}
+
 /* syntax-lint tokens (each carries a hover tooltip naming the syntax) */
 .tok{border-radius:2px}
 .tok:hover{background:rgba(255,255,255,.09)}
+.tok-more{color:#6f7d94}
 .tok-lt{color:#6f7d94}
 .tok-tag{color:#79c0ff}
 .tok-an{color:#e2b56a}
