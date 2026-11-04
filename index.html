@@ -1,0 +1,1800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Page Viewer — a DevTools-like DOM inspector for learning HTML and CSS.">
+<title>Page Viewer — HTML &amp; CSS inspector for learners</title>
+<style>
+/* ============================================================
+   Page Viewer — layout chrome
+   ============================================================ */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+:root{
+  --bg:#10151f; --pane:#171e2b; --pane2:#1f2937; --line:#2e394f;
+  --tx:#d6deeb; --dim:#8b98ad; --acc:#58a6ff; --pink:#ff5fa2;
+  --green:#3fb950; --amber:#e3b341; --red:#f85149; --purple:#d2a8ff;
+}
+html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);
+     font:14px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+button{font:inherit;color:var(--tx);background:var(--pane2);border:1px solid var(--line);
+       border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--acc);color:#fff}
+button.primary{background:#14407a;border-color:#2a5ea8;color:#fff}
+button.primary:hover{background:#1a4f96}
+input,select{font:inherit;background:#0f1420;border:1px solid var(--line);border-radius:6px;
+             color:var(--tx);padding:5px 9px}
+input:focus{outline:1px solid var(--acc)}
+a{color:var(--acc)}
+code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+
+#topbar{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--pane);
+        border-bottom:1px solid var(--line);flex-wrap:wrap}
+#brand{font-weight:700;letter-spacing:.3px;white-space:nowrap}
+#brand code{color:var(--acc);font-weight:600}
+#url{flex:1;min-width:220px;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.tlink{font-size:12.5px;white-space:nowrap}
+.hspacer{flex:1}
+
+#workspace{flex:1;display:grid;min-height:0;grid-template-rows:minmax(0,1fr);
+           grid-template-columns:minmax(240px,1fr) 6px clamp(460px,46vw,780px)}
+/* draggable divider between preview and the panels */
+#splitter{cursor:col-resize;position:relative;touch-action:none;user-select:none;background:var(--pane)}
+#splitter::after{content:'';position:absolute;top:0;bottom:0;left:50%;width:1px;transform:translateX(-50%);
+                 background:var(--line)}
+#splitter::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                  width:4px;height:42px;border-radius:2px;z-index:2;
+                  background-image:radial-gradient(circle,var(--dim) 1px,transparent 1.4px);
+                  background-size:4px 6px}
+#splitter:hover::after,#splitter.dragging::after{background:var(--acc);width:3px}
+#splitter:hover::before,#splitter.dragging::before{
+  background-image:radial-gradient(circle,var(--acc) 1px,transparent 1.4px)}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--pane);
+      border-right:1px solid var(--line);overflow:hidden}
+#learn{border-right:none}
+.pane-h{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--pane2);
+        border-bottom:1px solid var(--line);font:700 11px/1.4 system-ui;
+        text-transform:uppercase;letter-spacing:.8px;color:var(--dim);flex:none}
+.pane-h .hspacer{flex:1}
+.pane-h .hint{font:400 11px system-ui;text-transform:none;letter-spacing:0;color:var(--dim);white-space:nowrap}
+.pane-h button{padding:0 7px;font-size:12px;line-height:1.5}
+.pane-b{flex:1;overflow:auto;min-height:0;position:relative}
+.tools{display:flex;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);
+       align-items:center;flex-wrap:wrap;flex:none;font-size:12px;color:var(--dim)}
+.tools input{padding:3px 8px;font-size:12px}
+
+/* preview */
+#preview-body{background:#0d1117}
+#pv-frame{width:100%;height:100%;border:0;background:#fff;display:block}
+#load-banner{position:absolute;left:10px;right:10px;top:10px;z-index:6;padding:10px 14px;
+             background:#2d1a1c;border:1px solid #7a3038;border-radius:8px;font-size:13px}
+#load-banner b{color:#ffb3ad}
+#load-banner .acts{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* DOM tree */
+#breadcrumb{padding:3px 10px;border-bottom:1px solid var(--line);font:12px ui-monospace,Consolas,monospace;
+            color:#9ecb74;white-space:nowrap;overflow-x:auto;flex:none;min-height:22px}
+#breadcrumb .crumb{cursor:pointer}
+#breadcrumb .crumb:hover{color:#fff;text-decoration:underline}
+#breadcrumb .sep{color:#5b6b85;margin:0 4px}
+#tree{padding:4px 0 60px;font:12px/1.55 ui-monospace,"Cascadia Mono",Consolas,monospace;
+      position:relative;white-space:nowrap}
+.pv-row{display:flex;align-items:baseline;gap:5px;padding:1px 10px 1px 6px;cursor:pointer;
+        border-left:2px solid transparent}
+.pv-row:hover,.pv-row.pv-live{background:#263149}
+.pv-row.pv-sel{background:#123a63;border-left-color:var(--acc)}
+.pv-twist{width:12px;flex:none;color:var(--dim);text-align:center;user-select:none}
+.pv-twist:hover{color:#fff}
+.pv-tag{color:#79c0ff}
+.pv-id{color:#e2b56a}
+.pv-cls{color:#9ecb74}
+.pv-nattr{color:#5b6b85}
+.pv-text{color:#98a3b8}
+.pv-comment{color:#6f7d94;font-style:italic}
+.pv-doctype{color:#d2a8ff}
+.pv-kids{margin-left:12px;padding-left:2px;border-left:1px dotted #33415e}
+
+/* CSS panel */
+#css-body{padding:0 0 60px;font:12px/1.55 ui-monospace,"Cascadia Mono",Consolas,monospace}
+.pv-matches{padding:7px 10px 9px;border-bottom:1px solid var(--line);background:#1e2739}
+.pv-matches h4{margin:1px 0 6px;font:600 11px system-ui;color:var(--dim);letter-spacing:.4px}
+.pv-matches .hint{font:11px system-ui;color:#5b6b85;margin-top:5px}
+.pv-sheet{border-bottom:1px solid var(--line)}
+.pv-sheet-h{display:flex;gap:8px;align-items:center;padding:5px 10px;background:#1d2534}
+.pv-sheet-h .nm{color:#cdd9e5;font:600 12px system-ui}
+.pv-sheet-h .ct{color:#5b6b85;font:11px system-ui}
+.pv-sheet-h.unmanaged .nm{color:#8b98ad}
+.pv-rule{display:flex;gap:7px;align-items:flex-start;padding:2px 10px 2px 24px;cursor:pointer}
+.pv-rule:hover{background:#263149}
+.pv-rule.pv-rule-off .pv-sel-line,.pv-rule.pv-rule-off .pv-decl-line{opacity:.38;text-decoration:line-through}
+.pv-rule-body{flex:1;min-width:0}
+.pv-sel-line{color:var(--purple);overflow-wrap:anywhere}
+.pv-decls{padding-left:18px}
+.pv-decl-line{color:#8b98ad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-decl-line .rp{color:#79c0ff}
+.pv-brace{color:var(--purple)}
+.pv-rule.collapsed .pv-decls,.pv-rule.collapsed .pv-brace{display:none}
+.pv-rule.collapsed .pv-sel-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-rule.collapsed .pv-sel-line::after{content:" … }";color:#8b98ad}
+.pv-media{color:var(--amber);font-size:11px}
+.pv-media-line{color:var(--amber);font-size:11px}
+.pv-media-badge{color:var(--amber);font-size:10px;border:1px solid #54442a;border-radius:6px;padding:0 5px;white-space:nowrap}
+.pv-group{padding-left:0}
+.pv-sub{padding-left:16px;border-left:1px dotted #33415e;margin-left:24px}
+.pv-empty{padding:10px 12px;color:var(--dim);font:12px system-ui}
+
+/* right panel: HTML | CSS in the top row, Checklist | Reference below.
+   Both rows are CSS grid with explicit tracks — grid item heights are
+   definite, so the pane bodies flex and scroll correctly (stretched
+   cross-sizes in nested row-flex are NOT definite for flexing in Chrome). */
+#learn{display:grid;grid-template-rows:minmax(0,1.15fr) minmax(0,1fr);min-height:0;overflow:hidden}
+#top-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+         grid-auto-rows:minmax(0,1fr);min-height:0;min-width:0}
+#top-row>div,#checklist-sec,#mdn-sec{min-width:0;min-height:0}
+#html-pane{min-height:0;display:flex;flex-direction:column}
+#css-pane{min-height:0;display:flex;flex-direction:column;border-left:1px solid var(--line)}
+#learn-row{display:grid;grid-template-columns:minmax(0,0.78fr) minmax(0,1.22fr);
+           grid-auto-rows:minmax(0,1fr);min-height:0;min-width:0;border-top:1px solid var(--line)}
+
+/* Learn pane: checklist (left) + reference (right) below the top row */
+#mdn-sec{display:flex;flex-direction:column;min-width:0;min-height:0;
+         border-left:1px solid var(--line)}
+#mdn-head{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--pane2);
+          border-bottom:1px solid var(--line)}
+#mdn-pill{font:600 12px ui-monospace,Consolas,monospace;color:#0d1117;background:var(--acc);
+          border-radius:5px;padding:1px 7px}
+#mdn-pill.none{background:#3a465c;color:var(--dim)}
+#mdn-link{font-size:11.5px}
+#mdn-blurb{padding:7px 12px;color:#b9c6da;font-size:12.5px;border-bottom:1px solid var(--line)}
+#mdn-frame{flex:1;border:0;background:#fff;width:100%;display:none}
+#mdn-err{display:none;padding:10px 12px;color:#f0a39d;font-size:12px}
+#checklist-sec{min-width:0;display:flex;flex-direction:column;min-height:0;position:relative}
+#ck-toast{position:absolute;left:10px;right:10px;bottom:10px;z-index:20;background:#2d2410;
+  border:1px solid #6b5518;color:#f0d8a8;font:12.5px/1.4 system-ui;padding:8px 12px;
+  border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.5);pointer-events:none;
+  text-align:center;opacity:0}
+#ck-toast.show{animation:cktoast 2.8s both}
+@keyframes cktoast{0%{opacity:0;transform:translateY(6px)}10%,85%{opacity:1;transform:none}100%{opacity:0}}
+#ck-body{padding:4px 8px 24px}
+.ck-group{padding:8px 4px 2px;font:700 11px system-ui;text-transform:uppercase;
+          letter-spacing:.6px;color:var(--dim)}
+.ck-item{display:flex;gap:8px;align-items:center;padding:2px 6px;cursor:pointer;
+         border-left:2px solid transparent;white-space:nowrap;overflow:hidden}
+.ck-item:hover{background:#263149}
+.ck-item input{cursor:not-allowed}
+.ck-item code{color:#79c0ff;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ck-item .n{font:600 10px system-ui;color:#f0b37e;background:#3a2d1a;border-radius:8px;
+            padding:0 5px;flex:none}
+.ck-item.done{border-left-color:var(--green)}
+.ck-item.done code{color:var(--green)}
+.ck-item.pv-flash{animation:ckflash 1.3s}
+@keyframes ckflash{0%,55%{background:#274a2d}100%{background:transparent}}
+
+/* status strip, preview-width only */
+#statusbar{padding:4px 12px;background:var(--pane);border-top:1px solid var(--line);
+           font:12px system-ui;color:var(--dim);flex:none;white-space:nowrap;
+           overflow:hidden;text-overflow:ellipsis}
+#st-msg.err{color:#f0a39d}
+
+/* help dialog */
+dialog{background:var(--pane);color:var(--tx);border:1px solid var(--line);border-radius:10px;
+       max-width:560px;padding:0}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.dlg-body{padding:18px 22px}
+.dlg-body h3{margin:0 0 8px;font-size:16px}
+.dlg-body h4{margin:14px 0 4px;font-size:13px;color:var(--acc)}
+.dlg-body p,.dlg-body li{font-size:13px;color:#b9c6da}
+.dlg-body ul{margin:4px 0;padding-left:20px}
+.dlg-foot{display:flex;justify-content:flex-end;gap:8px;padding:0 22px 16px}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  #workspace{display:flex;flex-direction:column}
+  .pane{border-right:none;border-bottom:1px solid var(--line)}
+  #preview-pane{height:44vh;flex:none}
+  #learn{height:50vh;flex:none}
+  #splitter{display:none}
+}
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <span id="brand"><code>&lt;/&gt;</code> Page Viewer</span>
+  <input id="url" type="text" value="https://www.nanyangjc.moe.edu.sg/"
+         placeholder="https://www.nanyangjc.moe.edu.sg/"
+         aria-label="Page URL" spellcheck="false">
+  <button id="btn-load" title="Load the URL into the preview">Load page from URL</button>
+  <span class="hspacer"></span>
+  <a class="tlink" href="https://isomer-user-content.by.gov.sg/334/fbf2f4ef-108a-4331-8597-a8c71427cc8d/9569_y27_sp_2_RefG.pdf"
+     target="_blank" rel="noopener" title="H2 Computing Reference Guide (§4 HTML, §6 CSS)">RefG ↗</a>
+  <a class="tlink" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements"
+     target="_blank" rel="noopener">MDN ↗</a>
+  <button id="btn-help" title="How to use">?</button>
+</header>
+
+<main id="workspace">
+
+  <section id="preview-pane" class="pane">
+    <div class="pane-h"><span>Preview</span>
+      <span class="hint">hover = locate · click = select · links disabled</span>
+      <span class="hspacer"></span>
+      <button id="btn-reload" title="Reload the current page">⟳ reload</button>
+    </div>
+    <div class="pane-b" id="preview-body">
+      <iframe id="pv-frame" title="Page preview"
+              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div id="load-banner" hidden></div>
+    </div>
+    <div id="statusbar"><span id="st-msg">No page loaded.</span></div>
+  </section>
+
+  <div id="splitter" title="Drag to give more room to either side"></div>
+
+  <aside id="learn" class="pane">
+    <div id="top-row">
+      <div id="html-pane">
+        <div class="pane-h"><span>Hypertext Markup Language (HTML)</span></div>
+        <div class="tools">
+          <input id="tree-find" placeholder="find tag…" size="18" spellcheck="false" title="Find elements by tag name — Enter cycles through matches">
+        </div>
+        <div id="breadcrumb">&nbsp;</div>
+        <div class="pane-b" id="tree"></div>
+      </div>
+      <div id="css-pane">
+        <div class="pane-h"><span>Cascading StyleSheet (CSS)</span><span class="hspacer"></span>
+          <button id="btn-css-collapse-all" title="Collapse every rule to a single line">collapse</button>
+        </div>
+        <div class="pane-b" id="css-body"></div>
+      </div>
+    </div>
+    <div id="learn-row">
+      <div id="checklist-sec">
+        <div class="pane-h"><span>Checklist</span><span id="ck-progress" style="text-transform:none;letter-spacing:0"></span>
+          <span class="hspacer"></span>
+          <button id="btn-ck-reset" title="Untick everything">reset</button>
+        </div>
+        <div class="pane-b" id="ck-body"></div>
+        <div id="ck-toast" hidden></div>
+      </div>
+      <div id="mdn-sec">
+        <div id="mdn-head">
+          <span style="font:700 11px system-ui;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">HTML Tag:</span>
+          <span id="mdn-pill" class="none">—</span>
+          <span class="hspacer"></span>
+          <a id="mdn-link" href="#" target="_blank" rel="noopener" hidden>MDN Web Docs reference ↗</a>
+        </div>
+        <div id="mdn-blurb">Click an element in the HTML tree or on the page to read about it.</div>
+        <iframe id="mdn-frame" title="MDN reference content"
+                sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+        <div id="mdn-err"></div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<dialog id="help-dlg">
+  <div class="dlg-body">
+    <h3>Page Viewer — how to use</h3>
+    <ul>
+      <li>The <b>sample page</b> loads automatically (and comes back when you reload this tool). To inspect any other page, type its address in the URL bar and click <b>Load page from URL</b> — page scripts are always disabled in the preview.</li>
+      <li><b>Hover</b> rows in the HTML tree to outline the element on the page; hover the page to highlight its row in the tree.</li>
+      <li><b>Click</b> an element: it is outlined on the page, its MDN entry loads in the Reference panel, and it is ticked off the H2 Computing checklist (RefG §4).</li>
+      <li>In the <b>CSS</b> panel, untick any rule — or a whole stylesheet — to see the page without it. The top section lists the rules that currently match the selected element, most specific first. Blue property names appear in the RefG §6 property list.</li>
+      <li>Character references (<code>&amp;amp;</code> <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;quot;</code>) are ticked when you select content that needed them.</li>
+      <li>Progress is saved in this browser until you press <i>reset</i>.</li>
+    </ul>
+    <p style="font-size:11.5px;color:#8b98ad;margin-top:10px">Privacy: pages that cannot be read directly are fetched through a public CORS proxy service, so the URLs you inspect are shared with it — do not inspect pages that need a login. The preview always disables page JavaScript.</p>
+  </div>
+  <div class="dlg-foot"><button id="btn-dlg-close" class="primary">Close</button></div>
+</dialog>
+
+<script>
+/* ============================================================
+   DATA — syllabus checklist, element blurbs, sample page, proxies
+   ============================================================ */
+'use strict';
+
+const REF_G_PDF = 'https://isomer-user-content.by.gov.sg/334/fbf2f4ef-108a-4331-8597-a8c71427cc8d/9569_y27_sp_2_RefG.pdf';
+
+/* Properties listed in RefG §6 (marked in the CSS panel) */
+const REF_G_CSS = new Set(['display','background','color','height','width','border',
+  'border-bottom','border-left','border-right','border-top',
+  'margin','margin-bottom','margin-left','margin-right','margin-top',
+  'padding','padding-bottom','padding-left','padding-right','padding-top',
+  'font-family','font-size','font-style','font-weight','text-align','text-decoration']);
+
+/* Checklist = exactly the elements of RefG §4 "HTML Elements, Attributes and
+   Character References" (H2 Computing 9569, for use from 2027). */
+const CHECKLIST = [
+  {group:'Required — every document', items:[
+    ['doctype','The <code>&lt;!doctype html&gt;</code> declaration — the first line of every HTML document.'],
+    ['html','Root element that wraps the entire document.'],
+    ['head','Contains information about the page (title, linked stylesheets).'],
+    ['title','Text shown on the browser tab; lives inside <code>&lt;head&gt;</code>.'],
+    ['body','Contains everything visible on the page.'],
+  ]},
+  {group:'Metadata', items:[
+    ['link','Links an external resource — usually a CSS stylesheet (<code>rel</code>, <code>href</code>).'],
+  ]},
+  {group:'Structure', items:[
+    ['h1','Largest heading — the page title; use one per page.'],
+    ['h2','Second-level heading for major sections.'],
+    ['h3','Third-level heading for sub-sections.'],
+    ['p','A paragraph of text.'],
+    ['div','Generic block-level container for grouping content.'],
+    ['span','Generic inline container for part of a text.'],
+    ['hr','Horizontal rule — a visual break between sections.'],
+  ]},
+  {group:'Text and media', items:[
+    ['b','Bold text, drawing attention without extra importance.'],
+    ['i','Italic text — a different voice or mood, e.g. technical terms.'],
+    ['a','A hyperlink (<code>href</code> attribute).'],
+    ['img','An embedded image (<code>src</code>, <code>alt</code>).'],
+  ]},
+  {group:'Table', items:[
+    ['table','Wraps tabular data in rows and cells.'],
+    ['tr','A row of cells in a table.'],
+    ['th','A header cell — bold and centred by default.'],
+    ['td','A data cell in a table row.'],
+  ]},
+  {group:'Form', items:[
+    ['form','A section that collects user input (<code>action</code>, <code>method</code>, <code>enctype</code>).'],
+    ['input','An input control — text, checkbox, radio… (<code>type</code>, <code>name</code>, <code>value</code>).'],
+    ['textarea','A multi-line text input (<code>name</code>).'],
+  ]},
+  {group:'Character references (RefG §4)', entity:true, items:[
+    ['&amp;','Escape for <code>&amp;</code> — every character reference starts with an ampersand.'],
+    ['&lt;','Escape for <code>&lt;</code> so the browser does not read it as a tag.'],
+    ['&gt;','Escape for <code>&gt;</code> so the browser does not end a tag early.'],
+    ['&quot;','Escape for <code>"</code> inside attribute values.'],
+  ]},
+];
+const ENT_DEC = {'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"'};
+
+/* Short descriptions shown instantly in the Reference panel (MDN full text
+   loads below when the network allows). */
+const ELEMENT_INFO = {
+  doctype:'The DOCTYPE declaration tells the browser this is a modern HTML document. It must be the very first line.',
+  html:'Root element of the document. Everything else lives inside it; <code>lang</code> declares the language.',
+  head:'Holds metadata that is not displayed: the title, character set, and linked stylesheets.',
+  title:'The document title — shown on the browser tab and in search results. Required inside &lt;head&gt;.',
+  body:'Contains all content the user sees: text, images, tables, forms.',
+  link:'In &lt;head&gt;, links an external stylesheet: <code>&lt;link rel="stylesheet" href="style.css"&gt;</code>.',
+  h1:'A top-level heading. Pages should have exactly one, describing the page.',
+  h2:'A second-level heading, for major sections under the h1.',
+  h3:'A third-level heading, for sub-sections. Never skip levels just to make text bigger.',
+  p:'A paragraph — the workhorse block of body text.',
+  div:'A block-level box with no meaning of its own; used to group other elements for layout and styling.',
+  span:'An inline container with no meaning of its own; used to style a run of text inside a line.',
+  hr:'A thematic break between sections, drawn as a horizontal rule.',
+  b:'Bold text — draws attention without implying importance. Prefer &lt;strong&gt; for real importance.',
+  i:'Italic text — a different voice or mood, such as terms, ship names or foreign words.',
+  a:'An anchor — the heart of the web. <code>href</code> gives the destination; the content is what you click.',
+  img:'Embeds an image. <code>src</code> locates the file, <code>alt</code> describes it for screen readers and broken loads.',
+  table:'Represents tabular data in rows and cells — never for layout.',
+  tr:'A table row, containing th and/or td cells.',
+  th:'A table header cell — bold and centred; screen readers use it to navigate tables.',
+  td:'A table data cell, one square of the table.',
+  form:'Wraps input controls and says where (<code>action</code>) and how (<code>method</code>, <code>enctype</code>) to send them.',
+  input:'One-line input control; <code>type</code> picks text, checkbox, radio, submit…, <code>name</code> names the data.',
+  textarea:'Multi-line free text input; <code>name</code> names the data, rows/cols set the visible size.',
+  meta:'Document metadata: character set (<code>charset</code>), viewport, description.',
+  style:'An embedded stylesheet — CSS rules written directly inside the page.',
+  script:'Embeds or links program code. Not covered by this tool: the preview always disables scripts.',
+  ul:'An unordered (bulleted) list; items go in &lt;li&gt;.',
+  ol:'An ordered (numbered) list; items go in &lt;li&gt;.',
+  li:'A list item inside &lt;ul&gt; or &lt;ol&gt;.',
+  dl:'A description list of term/description pairs (&lt;dt&gt;, &lt;dd&gt;).',
+  dt:'A term in a description list.',
+  dd:'The description of a &lt;dt&gt; term.',
+  nav:'A section with major navigation links.',
+  header:'Introductory content for the page or a section: logo, title, nav.',
+  footer:'Closing content: contact details, copyright, links.',
+  main:'The dominant content of the page — only one per document.',
+  section:'A thematic grouping of content, usually with a heading.',
+  article:'A self-contained piece of content that would make sense on its own.',
+  aside:'Content tangentially related to the main content: sidebars, tip boxes.',
+  figure:'A self-contained figure (image, diagram, code) optionally with a &lt;figcaption&gt;.',
+  figcaption:'A caption for its parent &lt;figure&gt;.',
+  blockquote:'A extended quotation from another source.',
+  pre:'Preformatted text — whitespace and line breaks are kept; ideal for code.',
+  code:'A short run of computer code, normally monospaced.',
+  strong:'Strong importance — rendered bold by default.',
+  em:'Emphasis — rendered italic by default.',
+  br:'A line break within text (e.g. an address). Use sparingly.',
+  button:'A clickable button, usually to submit a form.',
+  label:'A caption for a form control — click it to focus the control; connect via <code>for</code>/id.',
+  select:'A dropdown list of &lt;option&gt; elements.',
+  option:'One choice inside a &lt;select&gt;.',
+  fieldset:'Groups related form controls with an optional &lt;legend&gt; outline.',
+  legend:'A caption for its parent &lt;fieldset&gt;.',
+  h4:'A fourth-level heading.', h5:'A fifth-level heading.', h6:'The smallest heading level.',
+  small:'Fine print: side comments, copyright.',
+  sup:'Superscript text (e.g. exponents, footnotes).',
+  sub:'Subscript text (e.g. chemical formulas).',
+  caption:'The caption of a table, describing its contents.',
+  thead:'The header rows of a table.',
+  tbody:'The body rows of a table.',
+  abbr:'An abbreviation or acronym; the <code>title</code> attribute spells it out.',
+  cite:'The title of a creative work (book, paper).',
+  q:'A short inline quotation, quoted automatically.',
+  mark:'Text highlighted for relevance (like a highlighter pen).',
+  time:'A date or time; <code>datetime</code> gives the machine-readable value.',
+};
+function fallbackInfo(tag){ return 'The <'+tag+'> element. Open the full MDN page for details.'; }
+
+const MDN_ELEMENTS = 'https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/';
+function mdnUrlFor(key){
+  if(key==='doctype') return 'https://developer.mozilla.org/en-US/docs/Glossary/Doctype';
+  if(key.charAt(0)==='&') return 'https://developer.mozilla.org/en-US/docs/Glossary/Character_reference';
+  if(/^h[1-6]$/.test(key)) return MDN_ELEMENTS+'Heading_Elements';
+  return MDN_ELEMENTS+key;
+}
+
+/* ---------- built-in sample page ---------- */
+const flaskSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260">'
+ +'<rect width="400" height="260" fill="#eef5f8"/>'
+ +'<path d="M170 38h60v12h-9v40l54 100a17 17 0 0 1-15 25H140a17 17 0 0 1-15-25l54-100V50h-9z" fill="#fff" stroke="#0b4f6c" stroke-width="4"/>'
+ +'<path d="M146 172l32-60h44l32 60a13 13 0 0 1-12 20H158a13 13 0 0 1-12-20z" fill="#7cc4ff" opacity="0.9"/>'
+ +'<circle cx="188" cy="152" r="7" fill="#dff1ff"/>'
+ +'<circle cx="213" cy="168" r="5" fill="#dff1ff"/>'
+ +'<circle cx="201" cy="132" r="4" fill="#dff1ff"/>'
+ +'<text x="200" y="244" text-anchor="middle" font-family="Verdana" font-size="13" fill="#0b4f6c">alum solution, day 5</text>'
+ +'</svg>';
+const flaskUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(flaskSvg);
+const EXTRA_CSS = '/* second stylesheet, linked with <link> so it appears as its own sheet */\n'
+ + '.tagline{letter-spacing:.05em}\n'
+ + '#join{border:2px dashed #0b4f6c;border-radius:8px;padding:4px 14px;margin-top:8px}\n'
+ + 'th{font-family:Verdana,sans-serif}\n';
+const extraUri = 'data:text/css;base64,' + btoa(EXTRA_CSS);
+
+const SAMPLE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nanyang Science Club — Crystal Growing</title>
+<link rel="stylesheet" href="${extraUri}">
+<style>
+/* element selector — lowest specificity */
+body{font-family:Georgia,'Times New Roman',serif;margin:0 auto;max-width:720px;
+     padding:0 16px;color:#1d2733;background:#fdfdf8;line-height:1.6}
+.sample-note{background:#fff8e1;border:1px solid #e6c34c;border-radius:6px;
+             padding:10px 14px;margin:14px 0 0;font-family:Verdana,sans-serif;font-size:.88em}
+h1,h2,h3{font-family:Verdana,sans-serif;color:#0b4f6c;line-height:1.25}
+a{color:#0a66c2}
+a:hover{color:#d0342c}            /* pseudo-class */
+p{margin:.6em 0}
+p.compact{line-height:1.25}       /* class beats element */
+#top{border-bottom:4px double #0b4f6c;padding-bottom:8px}
+#footer a{color:#7d8fa1}          /* id beats element selector */
+nav ul{list-style:none;display:flex;gap:12px;padding:0}
+nav a.link-btn{color:#fff;background:#0a66c2;padding:4px 14px;border-radius:4px;text-decoration:none}
+main{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+aside.tips{background:#eef4f7;border-left:4px solid #0b4f6c;padding:8px 12px;font-size:.95em}
+figure{margin:12px 0}
+figcaption{font-size:.85em;color:#5a6b7b}
+img{max-width:100%;height:auto;border:1px solid #d5dde3}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #b9c4cd;padding:6px 10px;text-align:left}
+thead th{background:#0b4f6c;color:#fff}
+tbody tr:nth-child(even){background:#eef2f6}   /* pseudo-class on rows */
+caption{caption-side:bottom;font-size:.85em;color:#5a6b7b;padding-top:6px}
+blockquote{margin:1em 0;padding:8px 14px;border-left:4px solid #d0342c;background:#fdf0ee;font-style:italic}
+pre{background:#f2f4f6;padding:10px;overflow:auto;border-radius:4px}
+code{font-family:'Courier New',monospace}
+mark{background:#ffe58a}
+label{display:inline-block;min-width:84px}
+button{font:inherit;background:#0a66c2;color:#fff;border:0;border-radius:4px;padding:6px 16px}
+@media (max-width:640px){         /* narrow preview pane triggers this */
+  main{grid-template-columns:1fr}
+  nav ul{flex-direction:column;gap:4px}
+}
+</style>
+</head>
+<body>
+
+<div class="sample-note">
+  <strong>This is a sample page</strong> built to demonstrate the basic HTML elements on
+  your checklist — explore it with the panels beside it. To inspect any other page, type
+  its address in the URL bar above and click <b>Load page from URL</b>.
+</div>
+
+<!-- Site header: appears on every page -->
+<header id="top">
+  <h1>Nanyang Science Club</h1>
+  <p class="tagline">Experiment of the month: <strong>crystal growing</strong></p>
+  <nav>
+    <ul>
+      <li><a href="#results">Results</a></li>
+      <li><a class="link-btn" href="#join">Join us</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <article class="intro">
+    <h2>This month's experiment</h2>
+    <p>We are growing <i>alum</i> crystals from a saturated solution. Alum is safe
+       to handle, and its crystals grow into regular octahedra you can see
+       <b>without a microscope</b>.</p>
+    <figure>
+      <img src="${flaskUri}" alt="A conical flask half filled with pale blue solution" width="400" height="260">
+      <figcaption>Fig 1 — our saturated alum solution on day 5.</figcaption>
+    </figure>
+    <h3>Steps</h3>
+    <ol>
+      <li>Dissolve alum in warm water until no more will dissolve.</li>
+      <li>Filter the solution into a clean beaker.</li>
+      <li>Wait <time datetime="P7D">one week</time> without disturbing it.</li>
+    </ol>
+    <blockquote>"Patience is a reagent." — <cite>Lab notice, Term 3</cite></blockquote>
+    <p>In HTML you write &lt;b&gt;bold&lt;/b&gt; as tags, and use &amp;amp; whenever
+       you mean a plain ampersand, as in R&amp;D.</p>
+    <p class="compact">This paragraph has a tighter line-height — compare it with the
+       paragraph above to see the effect of the <code>p.compact</code> rule.</p>
+    <hr>
+  </article>
+
+  <aside class="tips">
+    <h3>Lab tips</h3>
+    <ul>
+      <li>Use <mark>distilled water</mark> — dissolved minerals compete with your crystal.</li>
+      <li>Label every beaker.</li>
+    </ul>
+    <pre><code>mass = volume &times; concentration</code></pre>
+  </aside>
+
+  <section id="results">
+    <h2>Results so far</h2>
+    <table>
+      <caption>Crystal sizes after 7 days</caption>
+      <thead>
+        <tr><th>Beaker</th><th>Solution</th><th>Size (mm)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A</td><td>alum</td><td>12</td></tr>
+        <tr><td>B</td><td>copper sulfate</td><td>9</td></tr>
+        <tr><td>C</td><td>table salt</td><td>3</td></tr>
+      </tbody>
+    </table>
+    <p>Measurements taken with the club's <span class="room">digital calipers</span>.</p>
+  </section>
+
+  <section id="join">
+    <h2>Join the club</h2>
+    <form action="#" method="post" enctype="application/x-www-form-urlencoded">
+      <fieldset>
+        <legend>Member details</legend>
+        <p><label for="name">Name</label>
+           <input id="name" name="name" type="text" value="" placeholder="Full name"></p>
+        <p><label for="cls">Class</label>
+           <select id="cls" name="cls">
+             <option value="24S1">24S1</option>
+             <option value="24S2">24S2</option>
+             <option value="24S3">24S3</option>
+           </select></p>
+        <p><label for="why">Why join?</label><br>
+           <textarea id="why" name="why" rows="3" cols="28"></textarea></p>
+        <p><input id="weekly" name="weekly" type="checkbox" value="yes" checked>
+           <label for="weekly">Email me weekly</label></p>
+        <p><input type="submit" value="Sign up"></p>
+      </fieldset>
+    </form>
+  </section>
+</main>
+
+<footer id="footer">
+  <p><small>&copy; 2026 Nanyang Science Club &middot;
+     <a href="mailto:sci-club@nyjc.edu.sg" title="say &quot;hi&quot;">Email us</a></small></p>
+  <p>We meet in <span class="room">B4-05</span> on Thursdays, 3 pm.</p>
+</footer>
+
+</body>
+</html>`;
+
+/* Typography for the MDN mini-frame (light theme) */
+const MDN_CSS = `
+body{font:15px/1.65 system-ui,"Segoe UI",sans-serif;color:#1b1b1f;background:#fff;
+     margin:0;padding:18px 26px 60px;max-width:72ch;margin-inline:auto}
+h1{font-size:1.6em;line-height:1.2;border-bottom:1px solid #e5e7eb;padding-bottom:.3em}
+h1 code{font-size:.9em}
+h2{font-size:1.25em;margin-top:1.6em;border-bottom:1px solid #eef0f2;padding-bottom:.2em}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:#f2f4f7;
+     border-radius:4px;padding:1px 5px}
+pre{background:#f6f8fa;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;
+    overflow:auto;line-height:1.5}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;margin:12px 0}
+th,td{border:1px solid #d8dde3;padding:6px 12px;text-align:left;font-size:.92em}
+th{background:#f2f6fa}
+a{color:#1852cc}
+img{max-width:100%}
+blockquote{margin:12px 0;padding:8px 16px;border-left:4px solid #cdd7e1;background:#f8fafc;color:#3c4652}
+dl dt{font-weight:600;margin-top:.8em}
+dl dd{margin:2px 0 0 22px}
+hr{border:0;border-top:1px solid #e5e7eb;margin:20px 0}
+.notecard,.note{border:1px solid #d3e2f5;border-left:4px solid #4d9fff;background:#f2f8ff;
+   border-radius:4px;padding:10px 14px;margin:14px 0}
+`;
+
+/* Public CORS proxies (tried in order; the winner is remembered first next time) */
+const PROXIES = [
+  {name:'allorigins', make:u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)},
+  {name:'codetabs',   make:u=>'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u)},
+  {name:'corsproxy.io', make:u=>'https://corsproxy.io/?url='+encodeURIComponent(u)},
+];
+</script>
+
+<script>
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+function esc(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function absUrl(href, base){ try{ return new URL(href, base||undefined).href; }catch{ return href||''; } }
+function trunc(s, n){ s = s.replace(/\s+/g,' ').trim(); return s.length>n ? s.slice(0,n-1)+'…' : s; }
+
+/* Specificity (a,b,c) — ids, classes/attrs/pseudo-classes, element names */
+function specOf(sel){
+  let a=0,b=0,c=0, s=sel;
+  s = s.replace(/::[a-zA-Z-]+(\([^)]*\))?/g, ()=>{ c++; return ''; });
+  s = s.replace(/:not\(([^()]*)\)/g,'$1').replace(/:is\(([^()]*)\)/g,'$1').replace(/:where\(([^()]*)\)/g,'');
+  s = s.replace(/:[:\w-]+(\([^)]*\))?/g, ()=>{ b++; return ''; });
+  a = (s.match(/#[\w-]+/g)||[]).length; s = s.replace(/#[\w-]+/g,'');
+  b += (s.match(/\.[\w-]+/g)||[]).length; s = s.replace(/\.[\w-]+/g,'');
+  b += (s.match(/\[[^\]]*\]/g)||[]).length; s = s.replace(/\[[^\]]*\]/g,'');
+  c += (s.replace(/[>+~,\s]+/g,' ').match(/[a-zA-Z][\w-]*/g)||[]).filter(w=>w!=='*').length;
+  return [a,b,c];
+}
+function specCmp(x,y){ for(let i=0;i<3;i++){ if(x[i]!==y[i]) return x[i]-y[i]; } return 0; }
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+let statusTimer=null;
+function setStatus(msg, cls){
+  const el = $('#st-msg');
+  el.textContent = msg; el.className = cls||'';
+  if(cls==='err'){ clearTimeout(statusTimer); statusTimer=setTimeout(()=>{ if(el.className==='err'){ el.textContent='Ready.'; el.className=''; } }, 9000); }
+}
+
+/* ============================================================
+   FETCH — direct first, then CORS proxies, two passes over the
+   proxy list to ride out transient 5xx from the public services
+   ============================================================ */
+let PREF_PROXY = null;
+
+async function fetchText(url, timeout=20000, passes=2, directOnly=false){
+  const attempts = [];
+  if(directOnly){
+    attempts.push({name:'direct', u:url});
+  }else{
+    if(location.protocol !== 'file:') attempts.push({name:'direct', u:url});
+    if(PREF_PROXY){ const p = PROXIES.find(x=>x.name===PREF_PROXY); if(p) attempts.push({name:p.name, u:p.make(url)}); }
+    for(const p of PROXIES) if(!attempts.some(a=>a.name===p.name)) attempts.push({name:p.name, u:p.make(url)});
+  }
+
+  const errs=[];
+  for(let pass=0; pass<2; pass++){
+    for(const a of attempts){
+      if(pass>0 && a.name==='direct') continue;               /* second pass: proxies only */
+      if(pass>0 && a.name==='custom') continue;               /* custom was retried with proxies */
+      try{
+        const ctl = new AbortController();
+        const t = setTimeout(()=>ctl.abort(), timeout);
+        const res = await fetch(a.u, {signal:ctl.signal, redirect:'follow'});
+        clearTimeout(t);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const text = await res.text();
+        if(!text || text.length<30) throw new Error('empty response');
+        if(a.name!=='direct' && a.name!=='custom') PREF_PROXY = a.name;
+        return {text, via:a.name};
+      }catch(e){
+        errs.push(a.name+': '+(e.name==='AbortError' ? 'timeout' : (e.message||'failed')));
+      }
+    }
+    if(pass===0 && attempts.length>1) await new Promise(r=>setTimeout(r, 350));
+  }
+  throw new Error('all sources failed — '+errs.join(' · '));
+}
+
+function sheetName(url){
+  if(url.startsWith('data:')) return 'linked stylesheet (embedded)';
+  try{ const u = new URL(url); const f = u.pathname.split('/').filter(Boolean).pop() || '';
+       return (f ? f + ' — ' : '') + u.host; }catch{ return url.slice(0,60); }
+}
+
+/* data: URLs cannot always be fetched — decode the payload directly */
+function decodeDataUrl(url){
+  const comma = url.indexOf(',');
+  if(!url.startsWith('data:') || comma<0) return null;
+  const meta = url.slice(5, comma);
+  const payload = url.slice(comma+1);
+  try{
+    return /;base64$/i.test(meta) ? decodeURIComponent(escape(atob(payload)))
+                                  : decodeURIComponent(payload);
+  }catch{ return null; }
+}
+
+/* ============================================================
+   PAGE PREPARATION — parse, sanitise, inline stylesheets
+   ============================================================ */
+async function preparePage(htmlText, baseUrl){
+  const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+  if(!doc.querySelector('body') || doc.querySelectorAll('*').length < 4)
+    throw new Error('response does not look like an HTML page');
+
+  /* fetch external stylesheets so the CSS panel can manage them */
+  const nodes = [...doc.querySelectorAll('style, link[rel~="stylesheet"]')];
+  await Promise.all(nodes.map(n=>{
+    if(n.tagName==='STYLE'){ n._pv = n.textContent; n._pvName='inline <style>'; return Promise.resolve(); }
+    const href = n.getAttribute('href');
+    if(!href) return Promise.resolve();
+    if(href.startsWith('data:')){
+      const css = decodeDataUrl(href);
+      if(css){ n._pv = css; n._pvName = sheetName(href); }
+      return Promise.resolve();
+    }
+    const abs = absUrl(href, baseUrl);
+    return fetchText(abs, 15000)
+      .then(r=>{ n._pv = r.text; n._pvName = sheetName(abs); })
+      .catch(()=>{});                                        /* leave link for the browser */
+  }));
+
+  /* number the manageable sheets in document order */
+  const sheets = [];
+  for(const n of [...doc.querySelectorAll('style, link[rel~="stylesheet"]')]){
+    if(n._pv == null) continue;
+    const st = doc.createElement('style');
+    st.setAttribute('data-pv-sheet', sheets.length);
+    st.textContent = n._pv;
+    n.replaceWith(st);
+    sheets.push({name: sheets.some(s=>s.name===n._pvName && n._pvName==='inline <style>')
+                             ? n._pvName+' ('+(sheets.length+1)+')' : n._pvName, css:n._pv});
+  }
+
+  /* sanitise */
+  doc.querySelectorAll('script, noscript, object, embed, applet').forEach(n=>n.remove());
+  doc.querySelectorAll('meta').forEach(m=>{
+    const he = (m.getAttribute('http-equiv')||'').toLowerCase();
+    if(he==='refresh' || he==='content-security-policy') m.remove();
+  });
+  doc.querySelectorAll('[integrity]').forEach(n=>n.removeAttribute('integrity'));
+  doc.querySelectorAll('*').forEach(el=>{
+    for(const a of [...el.attributes]) if(/^on/i.test(a.name)) el.removeAttribute(a.name);
+  });
+
+  /* our own base: relative URLs resolve against the real site, links stay inert */
+  doc.querySelectorAll('base').forEach(b=>b.remove());
+  const base = doc.createElement('base');
+  base.setAttribute('href', baseUrl || location.href);
+  base.setAttribute('target','_blank');
+  base.setAttribute('data-pv-base','');
+  (doc.head || doc.documentElement).prepend(base);
+
+  const html = '<!doctype html>' + doc.documentElement.outerHTML;
+  return {html, sheets, baseUrl, rawSource: htmlText};
+}
+
+/* ============================================================
+   LOADING
+   ============================================================ */
+const state = { doc:null, baseUrl:'', via:'', sheets:[], sel:null, selRow:null, label:'', lastLoader:null };
+const frame = $('#pv-frame');
+const pending = {meta:null};
+
+function resetWorkspaces(){
+  state.doc=null; state.sel=null; state.selRow=null; state.baseUrl='';
+  $('#tree').innerHTML='';
+  $('#css-body').innerHTML='';
+  $('#breadcrumb') && ($('#breadcrumb').textContent='');
+  mdn.reset();
+}
+
+function banner(msg, url){
+  const b = $('#load-banner');
+  b.hidden = false;
+  b.innerHTML = '<b>Could not load this page.</b> '+esc(msg)
+    + '<br>Sites often block public proxies (the school website does), and proxies are sometimes down or rate-limited. You can still:'
+    + '<div class="acts">'
+    + '<button id="bn-sample" class="primary">Load the sample page</button>'
+    + '<button id="bn-retry">Try again</button>'
+    + (url ? '<a href="'+esc(url)+'" target="_blank" rel="noopener"><button>Open site directly ↗</button></a>' : '')
+    + '</div>';
+  $('#bn-sample').onclick = ()=>{ b.hidden=true; loadSample(); };
+  $('#bn-retry').onclick  = ()=>{ b.hidden=true; state.lastLoader && state.lastLoader(); };
+}
+
+async function loadUrl(url){
+  url = (url||'').trim();
+  if(!url) url = $('#url').placeholder;          /* the placeholder is the default target */
+  if(url && !/^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url;
+  if(!/^https?:/i.test(url)){ setStatus('Enter a http(s) URL.', 'err'); return; }
+  state.lastLoader = ()=>loadUrl(url);
+  setStatus('Loading '+url+' …');
+  $('#load-banner').hidden = true;
+  try{
+    const r = await fetchText(url, 25000);
+    const meta = await preparePage(r.text, url);
+    meta.via = r.via; meta.label = url;
+    mountPage(meta);
+  }catch(e){
+    resetWorkspaces();
+    banner(e.message, url);
+    setStatus('Load failed: '+e.message, 'err');
+  }
+}
+
+function loadSample(){
+  state.lastLoader = loadSample;
+  $('#load-banner').hidden = true;
+  setStatus('Preparing sample page …');
+  preparePage(SAMPLE_HTML, '')
+    .then(meta=>{
+      meta.via='built-in sample'; meta.label='sample page';
+      mountPage(meta);
+    })
+    .catch(e=>{ banner(e.message); setStatus('Sample failed: '+e.message, 'err'); });
+}
+
+function mountPage(meta){
+  resetWorkspaces();
+  pending.meta = meta;
+  frame.srcdoc = meta.html;
+}
+
+frame.addEventListener('load', ()=>{
+  const meta = pending.meta; pending.meta = null;
+  const doc = frame.contentDocument;
+  if(!meta || !doc || !doc.body) return;
+  state.doc = doc;
+  state.baseUrl = meta.baseUrl;
+  state.via = meta.via;
+  state.label = meta.label;
+  state.sheets = meta.sheets;
+  injectPageUi(doc);
+  tree.build(doc);
+  cssp.load(meta.sheets, doc);
+  checklist.scan(meta);
+  setStatus('Loaded '+meta.label+' — '+doc.querySelectorAll('*').length+' elements · '+
+            meta.sheets.length+' stylesheet'+(meta.sheets.length===1?'':'s')+' · via '+meta.via);
+});
+
+/* Styles injected into the inspected page: outlines, hover chip */
+const PAGE_UI_CSS = `
+#pv-chip{position:absolute;top:0;left:0;z-index:2147483647;font:600 11px/1.3 ui-monospace,Consolas,monospace;
+  background:#ff5fa2;color:#1c0410;padding:4px 9px;border-radius:5px 5px 5px 0;pointer-events:none;
+  box-shadow:0 2px 10px rgba(0,0,0,.4);display:none;white-space:nowrap;max-width:90vw;overflow:hidden}
+#pv-hover-overlay{position:absolute;z-index:2147483646;pointer-events:none;box-sizing:border-box;
+  background:rgba(255,95,162,.25);outline:1px solid #ff5fa2;display:none}
+.pv-selected{outline:2px solid #58a6ff !important;outline-offset:-1px;
+  background-color:rgba(88,166,255,.10) !important}
+`;
+
+function injectPageUi(doc){
+  const st = doc.createElement('style');
+  st.id = 'pv-ui-style';
+  st.textContent = PAGE_UI_CSS;
+  doc.head.appendChild(st);
+  const chip = doc.createElement('div');
+  chip.id = 'pv-chip';
+  doc.body.appendChild(chip);
+  const overlay = doc.createElement('div');
+  overlay.id = 'pv-hover-overlay';
+  doc.body.appendChild(overlay);
+
+  let liveEl=null;
+  function setLive(el){
+    if(el===liveEl) return;
+    if(liveEl){ liveEl.classList.remove('pv-hover'); const r=tree.rowFor(liveEl); if(r) r.row.classList.remove('pv-live'); }
+    liveEl = el;
+    if(el){
+      el.classList.add('pv-hover');
+      chip.textContent = elLabel(el) + ' · ' + (el.offsetWidth||0) + '×' + (el.offsetHeight||0);
+      chip.style.display='block';
+      /* DevTools-style translucent overlay + label pinned to the element's corner */
+      const win = doc.defaultView;
+      const r = el.getBoundingClientRect();
+      chip.style.left = (r.left + win.scrollX) + 'px';
+      chip.style.top = Math.max(2, r.top + win.scrollY) + 'px';
+      if(r.width>1 && r.height>1){
+        overlay.style.left = (r.left + win.scrollX) + 'px';
+        overlay.style.top = (r.top + win.scrollY) + 'px';
+        overlay.style.width = r.width + 'px';
+        overlay.style.height = r.height + 'px';
+        overlay.style.display = 'block';
+      }else overlay.style.display='none';
+      const r2 = tree.rowFor(el);
+      if(r2){ r2.row.classList.add('pv-live'); tree.scrollToRow(r2); }
+    }else{
+      chip.style.display='none';
+      overlay.style.display='none';
+    }
+  }
+  hoverApi = {set:setLive};
+  doc.addEventListener('mouseover', e=>{
+    const el = e.target.nodeType===1 ? e.target : e.target.parentElement;
+    if(!el || el.id==='pv-chip' || el.id==='pv-ui-style') return;
+    if(el.closest && !doc.body.contains(el)) return;
+    setLive(el);
+  });
+  doc.documentElement.addEventListener('mouseleave', ()=>setLive(null));
+
+  doc.addEventListener('click', e=>{
+    /* links and buttons are fully inert — clicking only selects */
+    const el = e.target.nodeType===1 ? e.target : e.target.parentElement;
+    if(el && el.closest && el.closest('a, button, input[type=submit], input[type=button], input[type=image]')){
+      e.preventDefault();
+      if(el.closest('a')) setStatus('Links are disabled in the preview — clicking selects the element.');
+    }
+    if(el && el.id!=='pv-chip' && el.id!=='pv-hover-overlay') selectElement(el, 'page');
+  });
+}
+
+function elLabel(el){
+  let s = '<'+el.tagName.toLowerCase()+'>';
+  if(el.id) s += ' #'+el.id;
+  else if(typeof el.className==='string'){
+    const cls = el.className.trim().split(/\s+/).filter(c=>c && !c.startsWith('pv-'));
+    if(cls.length) s += ' .'+cls.slice(0,2).join('.');
+  }
+  return s;
+}
+function pageClasses(el){
+  return typeof el.className==='string'
+    ? el.className.trim().split(/\s+/).filter(c=>c && !c.startsWith('pv-')) : [];
+}
+
+/* ============================================================
+   PAGE ↔ TREE HOVER (shared controller; injectPageUi fills it in)
+   ============================================================ */
+let hoverApi = null;
+
+/* ============================================================
+   DOM TREE
+   ============================================================ */
+function attrsHtml(el){
+  const skip = new Set(['id','class','style']);
+  let h='';
+  if(el.id) h += ' <span class="pv-id">#'+esc(el.id)+'</span>';
+  const cls = pageClasses(el).join('.');
+  if(cls) h += ' <span class="pv-cls">.'+esc(trunc(cls, 44))+'</span>';
+  const others = [...el.attributes].filter(a=>!skip.has(a.name) && !a.name.startsWith('data-pv'));
+  others.slice(0,3).forEach(a=>{
+    const v = a.value.length>26 ? esc(a.value.slice(0,25))+'…' : esc(a.value);
+    h += ' <span class="pv-nattr">'+esc(a.name)+(v?'="'+v+'"':'')+'</span>';
+  });
+  if(others.length>3) h += ' <span class="pv-nattr">+'+(others.length-3)+'</span>';
+  return h;
+}
+
+const tree = {
+  container: $('#tree'),
+  el2row: null,
+  root: null,
+
+  reset(){ this.container.innerHTML=''; this.el2row = new WeakMap(); this.root=null; findMatches=[]; findIdx=-1; },
+  rowFor(el){ return this.el2row ? this.el2row.get(el) : null; },
+
+  build(doc){
+    this.reset();
+    this._budget = 4000;                       /* rows to auto-expand on huge pages */
+    if(doc.doctype) this.container.appendChild(this.makeSpecialRow('<!doctype html>','pv-doctype','doctype',doc.doctype));
+    this.root = this.makeRow(doc.documentElement);
+    this.container.appendChild(this.root.holder);
+    this.expandAll(this.root);                 /* fully expanded — nothing hidden from new users */
+  },
+
+  expandAll(o){
+    if(!o || o.node.nodeType!==1 || this._budget<=0) return;
+    this.expand(o); this._budget--;
+    if(o.kids) for(const h of o.kids.children){
+      const c = h._pv;
+      if(c && c.node.nodeType===1) this.expandAll(c);
+    }
+  },
+
+  makeSpecialRow(label, cls, mdnKey, node){
+    const o = {node:node||null, key:mdnKey, built:true, open:false, kids:null, special:true};
+    o.holder = document.createElement('div'); o.holder._pv = o;
+    o.row = document.createElement('div'); o.row.className='pv-row '+cls;
+    o.row.innerHTML = '<span class="pv-twist"></span><span>'+esc(label)+'</span>';
+    o.row._pv = o;
+    o.holder.appendChild(o.row);
+    return o.holder;
+  },
+
+  makeRow(node){
+    const o = {node, built:false, open:false, kids:null};
+    o.holder = document.createElement('div'); o.holder._pv = o;
+    o.row = document.createElement('div'); o.row.className='pv-row'; o.row._pv = o;
+    if(node.nodeType===1){
+      o.row.innerHTML = '<span class="pv-twist">'+(twistable(node)?'▸':'')+'</span>'
+        + '<span class="pv-tag">&lt;'+node.tagName.toLowerCase()+'&gt;</span>' + attrsHtml(node);
+      this.el2row.set(node, o);
+    }else if(node.nodeType===3){
+      o.row.classList.add('pv-text');
+      o.row.innerHTML = '<span class="pv-twist"></span><span>"'+esc(trunc(node.textContent,90))+'"</span>';
+    }else if(node.nodeType===8){
+      o.row.classList.add('pv-comment');
+      o.row.innerHTML = '<span class="pv-twist"></span><span>&lt;!--'+esc(trunc(node.textContent,86))+'--&gt;</span>';
+    }
+    o.holder.appendChild(o.row);
+    return o;
+  },
+
+  buildChildren(o){
+    o.kids = document.createElement('div'); o.kids.className='pv-kids';
+    for(const n of o.node.childNodes){
+      if(n.nodeType===1 && (n.id==='pv-chip' || n.id==='pv-ui-style' || n.id==='pv-hover-overlay'
+         || (n.hasAttribute && n.hasAttribute('data-pv-base')))) continue;   /* our own UI */
+      if(n.nodeType===1 || n.nodeType===8 || (n.nodeType===3 && n.textContent.trim()))
+        o.kids.appendChild(this.makeRow(n).holder);
+    }
+    o.holder.appendChild(o.kids);
+    o.built = true;
+  },
+
+  expand(o){ if(!o.built) this.buildChildren(o); o.kids.style.display=''; o.open=true; this.twist(o,'▾'); },
+  collapse(o){ if(o.kids) o.kids.style.display='none'; o.open=false; this.twist(o,'▸'); },
+  toggle(o){ o.open ? this.collapse(o) : this.expand(o); },
+  twist(o,ch){ const t=o.row.querySelector('.pv-twist'); if(t) t.textContent=ch; },
+
+  scrollToRow(o){
+    const c = this.container, top = o.row.offsetTop;
+    if(top < c.scrollTop+6 || top > c.scrollTop + c.clientHeight - 24)
+      c.scrollTop = Math.max(0, top - c.clientHeight/2 + 12);
+  },
+
+  ensureVisible(node){
+    /* top-down: expanding each ancestor builds the next level's rows,
+       so the target's row may only come into existence mid-walk */
+    const chain=[];
+    for(let n = node.nodeType===1 ? node : node.parentElement; n && n.nodeType===1; n = n.parentElement)
+      chain.unshift(n);
+    if(this.root && !this.root.open) this.expand(this.root);
+    for(const el of chain){
+      const r = this.rowFor(el);
+      if(r && !r.open) this.expand(r);
+    }
+    const row = this.rowFor(node);
+    if(row) this.scrollToRow(row);
+    return row;
+  },
+};
+
+function twistable(el){
+  if(el.children.length>0) return true;
+  return [...el.childNodes].some(n=>n.nodeType===3 && n.textContent.trim());
+}
+
+/* tree events (delegated) */
+tree.container.addEventListener('click', e=>{
+  const rowEl = e.target.closest('.pv-row'); if(!rowEl || !rowEl._pv) return;
+  const o = rowEl._pv;
+  if(e.target.classList.contains('pv-twist') && o.node && o.node.nodeType===1 && twistable(o.node)){
+    tree.toggle(o); return;
+  }
+  if(o.special){                                  /* the doctype row */
+    clearSelection(); state.selRow=o; o.row.classList.add('pv-sel');
+    mdn.showFor('doctype'); checklist.tickKey('doctype'); cssp.showMatches(null);
+    return;
+  }
+  if(o.node.nodeType===1) selectElement(o.node, 'tree');
+  else selectTextNode(o);
+});
+tree.container.addEventListener('mouseover', e=>{
+  const rowEl = e.target.closest('.pv-row'); if(!rowEl || !rowEl._pv || !state.doc) return;
+  const n = rowEl._pv.node;
+  if(n.nodeType===1 && hoverApi) hoverApi.set(n);
+});
+tree.container.addEventListener('mouseleave', ()=>{ if(hoverApi) hoverApi.set(null); });
+
+/* find-as-you-type (Enter cycles through matches) */
+let findMatches=[], findIdx=-1;
+$('#tree-find').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); findNext(); }
+  else if(e.key==='Escape'){ e.target.value=''; }
+});
+function findNext(){
+  const q = $('#tree-find').value.trim().toLowerCase();
+  if(!q || !state.doc){ setStatus('Load a page, then search for a tag, id or class.', q?'err':undefined); return; }
+  const bare = q.replace(/^#/,'');
+  if(!findMatches.length || findMatches._q!==q){
+    findMatches = [...state.doc.querySelectorAll('*')].filter(el=>
+      el.tagName.toLowerCase().includes(bare)
+    );
+    findMatches._q = q; findIdx = -1;
+  }
+  if(!findMatches.length){ setStatus('Nothing matches “'+q+'”.', 'err'); return; }
+  findIdx = (findIdx+1) % findMatches.length;
+  setStatus('find: '+(findIdx+1)+' of '+findMatches.length+' — '+elLabel(findMatches[findIdx]));
+  selectElement(findMatches[findIdx], 'find');
+}
+
+/* ============================================================
+   SELECTION — breadcrumb, cross-highlighting, panels
+   ============================================================ */
+function clearSelection(){
+  if(state.sel){ state.sel.classList.remove('pv-selected'); state.sel=null; }
+  if(state.selRow){ state.selRow.row.classList.remove('pv-sel'); state.selRow=null; }
+}
+
+function selectElement(el, src){
+  clearSelection();
+  state.sel = el;
+  el.classList.add('pv-selected');
+  tree.ensureVisible(el);
+  const r = tree.rowFor(el);
+  if(r){ state.selRow=r; r.row.classList.add('pv-sel'); }
+  renderBreadcrumb(el);
+  mdn.showFor(el.tagName.toLowerCase());
+  checklist.tickForElement(el);
+  cssp.showMatches(el);
+  if(src!=='page') scrollPreviewTo(el);
+}
+
+/* scroll only the preview's window — scrollIntoView would also scroll the app page */
+function scrollPreviewTo(el){
+  try{
+    const win = el.ownerDocument.defaultView;
+    const r = el.getBoundingClientRect();
+    const top = r.top + win.scrollY - win.innerHeight/2 + Math.min(r.height, win.innerHeight)/2;
+    const left = r.left + win.scrollX - Math.max(0, (win.innerWidth - r.width)/2);
+    win.scrollTo({left: Math.max(0,left), top: Math.max(0,top)});
+  }catch{}
+}
+
+function selectTextNode(o){
+  clearSelection();
+  state.selRow = o;
+  tree.ensureVisible(o.node);
+  o.row.classList.add('pv-sel');
+  tree.scrollToRow(o);
+  const p = o.node.parentElement;
+  renderBreadcrumb(p);
+  mdn.showTextHint();
+  checklist.tickForText(o.node.textContent);
+  cssp.showMatches(p);
+}
+
+function renderBreadcrumb(el){
+  const bc = $('#breadcrumb');
+  if(!el){ bc.innerHTML='&nbsp;'; return; }
+  const chain=[];
+  for(let n=el; n && n.nodeType===1; n=n.parentElement) chain.unshift(n);
+  bc.innerHTML = chain.map(n=>
+    '<span class="crumb">&lt;'+n.tagName.toLowerCase()+'&gt;</span>'
+  ).join('<span class="sep">›</span>');
+  /* wire clicks */
+  const crumbs = bc.querySelectorAll('.crumb');
+  crumbs.forEach((c,i)=>{ c.onclick = ()=>selectElement(chain[i], 'crumb'); });
+}
+
+/* ============================================================
+   CSS PANEL — parse each stylesheet with the browser's own CSS
+   parser, list rules with toggles, show matching rules for the
+   selected element (most specific first)
+   ============================================================ */
+let RULE_SEQ = 0;
+function parseCss(cssText){
+  const d = document.implementation.createHTMLDocument('parse');
+  const st = d.createElement('style');
+  st.textContent = cssText;
+  d.head.appendChild(st);
+  return st.sheet ? [...st.sheet.cssRules] : [];
+}
+function modelize(rules){
+  function walk(list){
+    return list.map(r=>{
+      const n = {enabled:true, children:null, order:RULE_SEQ++};
+      if(typeof CSSStyleRule!=='undefined' && r instanceof CSSStyleRule){
+        n.kind='style'; n.sel=r.selectorText;
+        n.decls=[...r.style].map(p=>({p, v:r.style.getPropertyValue(p),
+                                      imp:r.style.getPropertyPriority(p)}));
+        n.spec = specOf(n.sel||'');
+        n.collapsed = n.decls.length<=1;      /* single-pair rules start collapsed */
+      }else if(typeof CSSMediaRule!=='undefined' && r instanceof CSSMediaRule){
+        n.kind='media'; n.label=r.conditionText||''; n.children=walk([...r.cssRules]);
+      }else if(typeof CSSSupportsRule!=='undefined' && r instanceof CSSSupportsRule){
+        n.kind='supports'; n.label=r.conditionText||''; n.children=walk([...r.cssRules]);
+      }else if(typeof CSSKeyframesRule!=='undefined' && r instanceof CSSKeyframesRule){
+        n.kind='keyframes'; n.label=r.name||'keyframes'; n.rawCss=r.cssText;
+      }else if(typeof CSSImportRule!=='undefined' && r instanceof CSSImportRule){
+        n.kind='import'; n.label=r.href||''; n.rawCss=r.cssText;
+      }else{
+        n.kind='other'; n.label=(r.cssText||'').slice(0,48); n.rawCss=r.cssText;
+      }
+      return n;
+    });
+  }
+  return walk(rules);
+}
+
+const cssp = {
+  sheets: [], styleEls: [], selEl: null,
+
+  reset(){ this.sheets=[]; this.styleEls=[]; this.selEl=null; },
+
+  load(sheetDefs, doc){
+    this.reset();
+    this.styleEls = [...doc.querySelectorAll('style[data-pv-sheet]')];
+    this.sheets = sheetDefs.map(d=>({name:d.name, enabled:true, dirty:false, expanded:false,
+                                     origCss:d.css, rules:modelize(parseCss(d.css))}));
+    this.render();
+  },
+
+  styleElFor(i){ return this.styleEls.find(el=>el.getAttribute('data-pv-sheet')==String(i)); },
+
+  serializeNode(n){
+    if(!n.enabled) return '';
+    if(n.kind==='media' || n.kind==='supports'){
+      const inner = n.children.map(c=>this.serializeNode(c)).join('\n');
+      return inner ? '@'+n.kind+' '+n.label+' {'+inner+'}' : '';
+    }
+    if(n.kind==='style'){
+      const decls = n.decls.map(d=>d.p+': '+d.v+(d.imp?' !important':'')).join('; ');
+      return n.sel+' { '+decls+'; }';
+    }
+    return n.rawCss || '';           /* keyframes/import/other keep browser text */
+  },
+
+  apply(){
+    const isOff = n => !n.enabled || !!(n.children && n.children.some(isOff));
+    this.sheets.forEach((sh,i)=>{
+      const el = this.styleElFor(i);
+      if(!el) return;
+      if(!sh.enabled){ el.textContent=''; return; }
+      if(sh.rules.some(isOff) || sh.dirty){
+        el.textContent = sh.rules.map(r=>this.serializeNode(r)).join('\n');
+        sh.dirty = true;
+      }else{
+        el.textContent = sh.origCss;      /* untouched sheets keep their raw source */
+      }
+    });
+    this.render();
+    const total = this.countRules(), off = total - this.countRules(true);
+    setStatus(off ? off+' of '+total+' rules disabled — compare the preview.' : total+' rules across '+this.sheets.length+' stylesheets.');
+  },
+  countRules(onlyEnabled){
+    let c=0;
+    const walk = list => list.forEach(n=>{
+      if(n.kind==='style'){ if(!onlyEnabled || n.enabled) c++; }
+      else if(n.children) walk(n.children);
+      else c++;
+    });
+    this.sheets.forEach(sh=>{ if(!onlyEnabled || sh.enabled) walk(sh.rules); });
+    return c;
+  },
+
+  nodeByPath(path){
+    const sh = this.sheets[path[0]];
+    if(!sh) return null;
+    let list = sh.rules, node = null;
+    for(let k=1; k<path.length; k++){
+      node = list[path[k]];
+      if(!node) return null;
+      if(k<path.length-1) list = node.children || [];
+    }
+    return node;
+  },
+
+  setEnabledByPath(path, on){
+    if(path.length===1){ const sh=this.sheets[path[0]]; if(sh) sh.enabled = on; }
+    else{ const n=this.nodeByPath(path); if(n) n.enabled = on; }
+    this.apply();
+    this.render();
+  },
+
+  /* ---------- rendering ---------- */
+  render(){
+    const box = $('#css-body');
+    const out = [];
+    if(this.selEl) this.matchedHtml(out);
+    if(!this.sheets.length){
+      out.push('<div class="pv-empty">No manageable stylesheet on this page.</div>');
+    }
+    this.sheets.forEach((sh,si)=>{
+      const nr = this.countSheetRules(sh);
+      out.push('<div class="pv-sheet">');
+      out.push('<div class="pv-sheet-h'+(sh.unmanaged?' unmanaged':'')+'" data-sheet="'+si+'">'
+        +(sh.unmanaged?'':'<span class="pv-twist">'+(sh.expanded?'▾':'▸')+'</span>')
+        +'<input type="checkbox" data-sheet="'+si+'" '+(sh.enabled?'checked':'')+' title="Enable / disable this whole stylesheet">'
+        +'<span class="nm">'+esc(sh.name)+'</span>'
+        +'<span class="ct">'+(sh.unmanaged?'loaded by browser — no toggles':nr+' rules')+'</span></div>');
+      if(!sh.unmanaged && sh.expanded) this.rulesHtml(sh.rules, si, out, 0);
+      out.push('</div>');
+    });
+    box.innerHTML = out.join('');
+  },
+  countSheetRules(sh){
+    let c=0;
+    const walk = list => list.forEach(n=>{ if(n.children) walk(n.children); else c++; });
+    walk(sh.rules); return c;
+  },
+
+  rulesHtml(rules, si, out, depth){
+    rules.forEach((n,ri)=>{
+      if(n.kind==='media' || n.kind==='supports'){
+        out.push('<div class="pv-rule pv-group">'
+          +'<input type="checkbox" data-path="'+si+':'+ri+'" '+(n.enabled?'checked':'')+'>'
+          +'<span class="pv-media">@'+n.kind+' '+esc(n.label)+'</span></div>'
+          +'<div class="pv-sub">');
+        n.children.forEach((c,ci)=>this.ruleHtml(c, si+':'+ri+':'+ci, out));
+        out.push('</div>');
+      }else this.ruleHtml(n, si+':'+ri, out);
+    });
+  },
+  ruleHtml(n, path, out){
+    if(n.kind==='style'){
+      const collapsed = n.collapsed ? ' collapsed' : '';
+      const decls = n.decls.map(d=>'<div class="pv-decl-line">'+declHtml(d)+'</div>').join('');
+      out.push('<div class="pv-rule'+collapsed+(n.enabled?'':' pv-rule-off')+'" data-path="'+path+'">'
+        +'<input type="checkbox" data-path="'+path+'" '+(n.enabled?'checked':'')+'>'
+        +'<div class="pv-rule-body">'
+        +'<div class="pv-sel-line">'+esc(n.sel)+' {</div>'
+        +'<div class="pv-decls">'+decls+'</div>'
+        +'<div class="pv-brace">}</div>'
+        +'</div></div>');
+    }else{
+      const label = n.kind==='keyframes' ? '@keyframes '+n.label
+                  : n.kind==='import' ? '@import '+n.label
+                  : n.kind==='other' ? esc(n.label) : '@'+n.kind;
+      out.push('<div class="pv-rule'+(n.enabled?'':' pv-rule-off')+'" data-path="'+path+'">'
+        +'<input type="checkbox" data-path="'+path+'" '+(n.enabled?'checked':'')+'>'
+        +'<span class="pv-media">'+esc(label)+'</span></div>');
+    }
+  },
+
+  matchedHtml(out){
+    const el = this.selEl;
+    const hits = this.matchedRules(el);
+    out.push('<div class="pv-matches"><h4>Rules matching '+esc(elLabel(el))+'</h4>');
+    if(!hits.length) out.push('<div class="hint">No stylesheet rule selects this element — everything you see comes from the browser defaults.</div>');
+    hits.forEach(h=>{
+      const collapsed = h.node.collapsed ? ' collapsed' : '';
+      const decls = h.node.decls.map(d=>'<div class="pv-decl-line">'+declHtml(d)+'</div>').join('');
+      out.push('<div class="pv-rule'+collapsed+(h.node.enabled?'':' pv-rule-off')+'" data-path="'+h.path.join(':')+'">'
+        +'<input type="checkbox" data-path="'+h.path.join(':')+'" '+(h.node.enabled?'checked':'')+'>'
+        +'<div class="pv-rule-body">'
+        +'<div class="pv-sel-line">'+esc(h.node.sel)+' {</div>'
+        +(h.media?'<div class="pv-media-line">in @media '+esc(h.media)+'</div>':'')
+        +'<div class="pv-decls">'+decls+'</div>'
+        +'<div class="pv-brace">}</div>'
+        +'</div></div>');
+    });
+    out.push('<div class="hint">Top rules win: later rules and higher specificity (id → class → element) override the rest. Click a rule to collapse or expand it; blue names are in the RefG §6 list.</div></div>');
+  },
+
+  matchedRules(el){
+    const hits=[];
+    this.sheets.forEach((sh,si)=>{
+      if(sh.unmanaged || !sh.enabled) return;
+      const walk = (list, prefix, media)=>{
+        list.forEach((n,i)=>{
+          const path = prefix.concat(i);
+          if(n.kind==='style'){
+            try{ if(el.matches(n.sel)) hits.push({node:n, path, media}); }catch{}
+          }else if(n.children){
+            walk(n.children, path, n.kind==='media' ? n.label : media);
+          }
+        });
+      };
+      walk(sh.rules, [si], null);     /* sheet index first — data paths must identify the sheet */
+    });
+    hits.sort((a,b)=> -specCmp(a.node.spec,b.node.spec) || b.node.order-a.node.order);
+    return hits;
+  },
+
+  showMatches(el){
+    this.selEl = el;
+    this.render();
+  },
+};
+
+function declHtml(d){
+  const cls = REF_G_CSS.has(d.p) ? ' class="rp" title="Property listed in the H2 Computing Reference Guide (§6)"' : '';
+  return '<span'+cls+'>'+esc(d.p)+': '+esc(d.v)+(d.imp?' !important':'')+'</span>';
+}
+
+/* rule checkbox + expand-on-click (delegated) */
+$('#css-body').addEventListener('change', e=>{
+  const cb = e.target;
+  if(cb.type!=='checkbox') return;
+  if(cb.dataset.sheet!=null){                     /* whole-stylesheet toggle */
+    const sh = cssp.sheets[+cb.dataset.sheet];
+    if(sh){ sh.enabled = cb.checked; cssp.apply(); cssp.render(); }
+    return;
+  }
+  if(cb.dataset.path) cssp.setEnabledByPath(cb.dataset.path.split(':').map(Number), cb.checked);
+});
+$('#css-body').addEventListener('click', e=>{
+  if(e.target.type==='checkbox') return;
+  const sheetH = e.target.closest('.pv-sheet-h');   /* expand / collapse a stylesheet section */
+  if(sheetH && sheetH.dataset.sheet!=null){
+    const sh = cssp.sheets[+sheetH.dataset.sheet];
+    if(sh && !sh.unmanaged){ sh.expanded = !sh.expanded; cssp.render(); }
+    return;
+  }
+  const rule = e.target.closest('.pv-rule');
+  if(rule && rule.dataset.path){                    /* collapse / expand a rule */
+    const node = cssp.nodeByPath(rule.dataset.path.split(':').map(Number));
+    if(node && node.kind==='style'){
+      node.collapsed = !node.collapsed;
+      rule.classList.toggle('collapsed', node.collapsed);
+    }
+  }
+});
+
+/* ============================================================
+   MDN REFERENCE PANEL — instant local summary, full MDN page
+   fetched through the same proxy chain when the network allows
+   ============================================================ */
+const mdn = {
+  cur:null, cache:new Map(), failed:new Map(),
+  pill: $('#mdn-pill'), blurb: $('#mdn-blurb'),
+  frameEl: $('#mdn-frame'), err: $('#mdn-err'), link: $('#mdn-link'),
+
+  reset(){
+    this.cur=null; this.setPill('—'); this.link.hidden=true;
+    this.blurb.innerHTML='Click an element in the HTML tree or on the page to read about it.';
+    this.frameEl.style.display='none'; this.frameEl.srcdoc='';
+    this.err.style.display='none';
+  },
+
+  setPill(t){ this.pill.textContent=t; this.pill.classList.toggle('none', t==='—'); },
+
+  showFor(key){
+    this.cur=key;
+    this.setPill('<'+key+'>');
+    this.blurb.innerHTML = ELEMENT_INFO[key] || fallbackInfo(key);
+    const url = mdnUrlFor(key);
+    this.link.hidden=false; this.link.href=url;
+    this.frameEl.style.display='none'; this.frameEl.srcdoc='';
+    if(this.cache.has(key)){ this.render(this.cache.get(key)); return; }
+    if(this.failed.has(key) && Date.now()-this.failed.get(key) < 90000){
+      this.err.style.display='block';
+      this.err.innerHTML='MDN was unavailable moments ago — <a href="'+esc(url)+'" target="_blank" rel="noopener">open MDN ↗</a> or come back shortly.';
+      return;
+    }
+    this.err.style.display='block'; this.err.textContent='Loading the full MDN page…';
+    this.loadMdn(key, url);
+  },
+
+  loadMdn(key, pageUrl){
+    const done = html => { this.cache.set(key, html); if(this.cur===key) this.render(html); };
+    const fail = e => {
+      if(this.cur!==key) return;
+      this.failed.set(key, Date.now());
+      this.err.innerHTML = 'Full MDN page unavailable right now ('+esc(trunc(e.message,110))+'). '
+        +'The summary above is built in — <a href="'+esc(pageUrl)+'" target="_blank" rel="noopener">open MDN ↗</a>';
+    };
+    const raw = mdnRawUrl(key);
+    const first = raw ? fetchText(raw, 10000, 1, true) : Promise.reject(new Error('no raw source'));
+    first.then(r => done(mdToHtml(r.text, pageUrl)))
+      .catch(() => fetchText(pageUrl, 15000)
+        .then(r => done(extractMdn(r.text, pageUrl)))
+        .catch(fail));
+  },
+
+  showTextHint(){
+    this.cur='__text';
+    this.setPill('text');
+    this.blurb.innerHTML='A <b>text node</b> — the content inside an element. Its meaning comes from the element that contains it: select the parent element to see its rules.';
+    this.link.hidden=true;
+    this.frameEl.style.display='none'; this.frameEl.srcdoc='';
+    this.err.style.display='none';
+  },
+
+  render(html){
+    this.err.style.display='none';
+    this.frameEl.srcdoc=html;
+    this.frameEl.style.display='block';
+  },
+};
+
+function extractMdn(htmlText, pageUrl){
+  const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+  const art = doc.querySelector('main#content') || doc.querySelector('article')
+           || doc.querySelector('main') || doc.body;
+  if(!art) throw new Error('unexpected MDN page structure');
+  art.querySelectorAll('script,style,link,nav,aside,form,button,input,select,textarea,iframe,object,embed,'
+    +'.breadcrumbs,.content-feedback,.article-footer,[id="browser_compatibility"],[role="navigation"]')
+    .forEach(n=>n.remove());
+  return '<!doctype html><html><head><meta charset="utf-8">'
+    +'<base href="'+pageUrl+'" target="_blank">'
+    +'<style>'+MDN_CSS+'</style></head><body>'+art.innerHTML+'</body></html>';
+}
+
+/* Primary MDN source: the mdn/content repo via jsDelivr — CORS-open, fast,
+   no proxy needed. Renders the page's Markdown source. */
+function mdnRawUrl(key){
+  let slug=null;
+  if(key==='doctype') slug='glossary/doctype';
+  else if(key.charAt(0)==='&') slug='glossary/character_reference';
+  else if(/^h[1-6]$/i.test(key)) slug='web/html/reference/elements/heading_elements';
+  else if(/^[a-z0-9]+$/i.test(key)) slug='web/html/reference/elements/'+key.toLowerCase();
+  return slug ? 'https://cdn.jsdelivr.net/gh/mdn/content@main/files/en-us/'+slug+'/index.md' : null;
+}
+
+/* Minimal Markdown renderer for MDN repo pages: front matter, macro calls,
+   fenced code (skipping interactive examples), raw HTML blocks (MDN embeds
+   its attribute tables verbatim), headings, lists, quotes, inline code,
+   links and bold. */
+function mdToHtml(md, pageUrl){
+  let title='';
+  const fm=/^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
+  if(fm){ const t=/^title:\s*(.+)$/m.exec(fm[1]); if(t) title=t[1].trim().replace(/^["']+|["']+$/g,''); }
+  md = md.replace(/^---\r?\n[\s\S]*?\r?\n---\s*\n/, '');
+  md = md.replace(/\{\{InteractiveExample[^{}]*\}\}/g, '');   /* live demos need JS */
+  md = md.replace(/\{\{[^{}]*\}\}/g, m=>{
+    const q=/"([^"]*)"/.exec(m);
+    return q ? '`'+q[1].replace(/&lt;/g,'<').replace(/&gt;/g,'>')+'`' : '';
+  });
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (m2,t2,u2)=>{
+      const href = u2.startsWith('/') ? 'https://developer.mozilla.org'+u2 : u2;
+      return '<a href="'+href+'">'+t2+'</a>';
+    });
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    return s;
+  }
+  const lines = md.split(/\r?\n/);
+  const out=[];
+  let i=0, para=[], listType=null, inCode=false, codeBuf=[];
+  const flushPara=()=>{ if(para.length){ out.push('<p>'+inline(para.join(' '))+'</p>'); para=[]; } };
+  const closeList=()=>{ if(listType){ out.push('</'+listType+'>'); listType=null; } };
+  const openList=t=>{ if(listType!==t){ closeList(); listType=t; out.push('<'+t+'>'); } };
+  while(i<lines.length){
+    const line=lines[i];
+    if(inCode){
+      if(/^```/.test(line)){ out.push('<pre><code>'+esc(codeBuf.join('\n'))+'</code></pre>'); inCode=false; codeBuf=[]; }
+      else codeBuf.push(line);
+      i++; continue;
+    }
+    const fence=/^```\s*([\w-]*)/.exec(line);
+    if(fence){
+      flushPara(); closeList();
+      if(/interactive-example/.test(line)){            /* live demo needs JS — skip the block */
+        i++; while(i<lines.length && !/^```/.test(lines[i])) i++; i++; continue;
+      }
+      inCode=true; codeBuf=[]; i++; continue;
+    }
+    if(/^\s*$/.test(line)){ flushPara(); closeList(); i++; continue; }
+    const h=/^(#{1,5})\s+(.*)$/.exec(line);
+    if(h){ flushPara(); closeList(); const l=Math.min(h[1].length+1,5);
+           out.push('<h'+l+'>'+inline(h[2])+'</h'+l+'>'); i++; continue; }
+    if(/^(-{3,}|\*{3,})\s*$/.test(line)){ flushPara(); closeList(); out.push('<hr>'); i++; continue; }
+    if(/^<[^>]/.test(line)){
+      flushPara(); closeList();
+      if(/^<\/?(table|dl|div|p|ol|ul|h[1-6]|blockquote|figure|pre|section|details|video|audio|iframe|main|nav|span)\b/i.test(line)){
+        const buf=[];
+        while(i<lines.length && !/^\s*$/.test(lines[i])){ buf.push(lines[i]); i++; }
+        out.push(buf.join('\n')); continue;
+      }
+    }
+    let li=/^[-*]\s+(.*)$/.exec(line);
+    if(li){ flushPara(); openList('ul'); out.push('<li>'+inline(li[1])+'</li>'); i++; continue; }
+    li=/^\d+[.)]\s+(.*)$/.exec(line);
+    if(li){ flushPara(); openList('ol'); out.push('<li>'+inline(li[1])+'</li>'); i++; continue; }
+    if(/^> ?/.test(line)){ flushPara(); closeList(); out.push('<blockquote>'+inline(line.replace(/^> ?/,''))+'</blockquote>'); i++; continue; }
+    para.push(line.trim()); i++;
+  }
+  flushPara(); closeList();
+  const h1 = title ? '<h1>'+inline(title)+'</h1>' : '';
+  /* raw HTML blocks (attribute tables) carry repo-relative links */
+  let bodyHtml = out.join('\n').replace(/href="\//g, 'href="https://developer.mozilla.org/');
+  return '<!doctype html><html><head><meta charset="utf-8">'
+    +'<base href="'+pageUrl+'" target="_blank">'
+    +'<style>'+MDN_CSS+'</style></head><body>'+h1+bodyHtml+'</body></html>';
+}
+
+/* ============================================================
+   CHECKLIST — the H2 Computing Reference Guide §4 element list
+   ============================================================ */
+const checklist = {
+  checked: new Set(),
+  items: [],                /* {key, entity, row} */
+  counts: new Map(),
+
+  init(){
+    try{ const s=localStorage.getItem('pv.ck.v1'); if(s) this.checked=new Set(JSON.parse(s)); }catch{}
+    const frag = document.createDocumentFragment();
+    CHECKLIST.forEach(g=>{
+      frag.append(Object.assign(document.createElement('div'), {className:'ck-group', textContent:g.group}));
+      g.items.forEach(([key])=>{
+        const row = document.createElement('div');
+        row.className='ck-item'; row.dataset.key=key;
+        row.title='Find this element on the page (or in the tree) and click it — it ticks itself';
+        row.innerHTML = '<input type="checkbox"><code>'
+          + esc(key==='doctype' ? '<!doctype html>' : key)
+          + '</code><span class="n" hidden></span>';
+        frag.append(row);
+        this.items.push({key, entity:!!g.entity, row});
+      });
+    });
+    this.container = $('#ck-body');
+    this.container.append(frag);
+
+    /* checkboxes are indicators only — items tick themselves when the
+       student selects the element on the page or in the tree */
+    this.container.addEventListener('click', e=>{
+      if(e.target.type==='checkbox'){
+        e.preventDefault();
+        ckToast('Items tick themselves: find and click the matching element on the page (or in the HTML tree).');
+        return;
+      }
+      const row=e.target.closest('.ck-item'); if(!row) return;
+      this.jumpTo(row.dataset.key);
+    });
+    $('#btn-ck-reset').addEventListener('click', ()=>{
+      this.checked.clear(); this.save(); this.updateAll();
+    });
+    this.updateAll();
+  },
+
+  save(){ try{ localStorage.setItem('pv.ck.v1', JSON.stringify([...this.checked])); }catch{} },
+
+  scan(meta){
+    const doc = state.doc;
+    this.counts = new Map();
+    for(const it of this.items){
+      if(it.entity){
+        this.counts.set(it.key, countOccurrences(meta.rawSource||'', it.key));
+      }else{
+        let n=0;
+        try{
+          n = it.key==='doctype' ? (doc.doctype?1:0) : doc.querySelectorAll(it.key).length;
+        }catch{}
+        this.counts.set(it.key, n);
+      }
+    }
+    this.updateAll();
+  },
+
+  tickForElement(el){
+    this.tickKey(el.tagName.toLowerCase());
+    this.tickForText(el.textContent || '');
+  },
+  tickForText(text){
+    for(const it of this.items)
+      if(it.entity && !this.checked.has(it.key) && text.includes(ENT_DEC[it.key])) this.tick(it.key);
+  },
+  tickKey(key){ if(this.items.some(i=>i.key===key)) this.tick(key); },
+  tick(key){
+    if(this.checked.has(key)) return;
+    this.checked.add(key); this.save();
+    const it=this.items.find(i=>i.key===key);
+    if(it){
+      this.updateRow(it.row); this.progress();
+      it.row.classList.add('pv-flash');
+      setTimeout(()=>it.row.classList.remove('pv-flash'), 1300);
+      this.scrollTo(it.row);
+    }
+  },
+
+  jumpTo(key){
+    if(!state.doc){ setStatus('Load a page first — then click checklist entries to find them on it.', 'err'); return; }
+    if(key==='doctype'){
+      const root=state.doc.documentElement;
+      if(this.checked.has(key)) setStatus('The doctype is already ticked — it is the first line of the source.');
+      selectElement(root, 'checklist'); mdn.showFor('doctype');
+      return;
+    }
+    let el=null;
+    if(key.charAt(0)==='&'){
+      const dec = ENT_DEC[key];
+      const all = [...state.doc.querySelectorAll('body *')];
+      el = all.find(e=>!e.children.length && (e.textContent||'').includes(dec))
+        || all.find(e=>(e.textContent||'').includes(dec));
+    }else{
+      try{ el = state.doc.querySelector(key); }catch{}
+    }
+    if(el) selectElement(el, 'checklist');
+    else setStatus('“'+key+'” is not on this page — try another page or the sample.', 'err');
+  },
+
+  updateRow(row){
+    const key=row.dataset.key;
+    const n=this.counts.get(key)||0;
+    row.querySelector('input').checked = this.checked.has(key);
+    row.classList.toggle('done', this.checked.has(key));
+    const nEl=row.querySelector('.n');
+    nEl.hidden = !n; nEl.textContent='×'+n;
+  },
+  updateAll(){ this.items.forEach(it=>this.updateRow(it.row)); this.progress(); },
+  progress(){
+    const done=this.items.filter(i=>this.checked.has(i.key)).length;
+    $('#ck-progress').textContent = done+' / '+this.items.length;
+  },
+  scrollTo(row){
+    const c=this.container, top=row.offsetTop;
+    if(top < c.scrollTop+4 || top > c.scrollTop + c.clientHeight - 28)
+      c.scrollTop = Math.max(0, top - c.clientHeight/2 + 14);
+  },
+};
+
+function countOccurrences(s, sub){ return sub ? s.split(sub).length-1 : 0; }
+
+/* toast in the checklist panel */
+let ckToastTimer=null;
+function ckToast(msg){
+  const t=$('#ck-toast');
+  t.textContent=msg;
+  t.hidden=false;
+  t.classList.remove('show');
+  void t.offsetWidth;                        /* restart the animation */
+  t.classList.add('show');
+  clearTimeout(ckToastTimer);
+  ckToastTimer=setTimeout(()=>{ t.hidden=true; t.classList.remove('show'); }, 2850);
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+checklist.init();
+mdn.reset();
+
+$('#btn-load').addEventListener('click', ()=>loadUrl($('#url').value));
+$('#url').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); loadUrl(e.target.value); }
+});
+$('#btn-reload').addEventListener('click', ()=>{
+  if(state.lastLoader) state.lastLoader();
+  else setStatus('Nothing to reload yet — load a page first.');
+});
+/* collapse every rule to its single-line form */
+$('#btn-css-collapse-all').addEventListener('click', ()=>{
+  const walk = list => list.forEach(n=>{
+    if(n.kind==='style') n.collapsed = true;
+    if(n.children) walk(n.children);
+  });
+  cssp.sheets.forEach(sh=>{ if(!sh.unmanaged) walk(sh.rules); });
+  cssp.render();
+});
+
+/* help dialog */
+const helpDlg = $('#help-dlg');
+$('#btn-help').addEventListener('click', ()=>helpDlg.showModal());
+$('#btn-dlg-close').addEventListener('click', ()=>helpDlg.close());
+
+window.addEventListener('error', e=>setStatus('Script error: '+e.message, 'err'));
+
+/* draggable divider between preview and panels */
+const ws = $('#workspace');
+let splitW = null;
+function applySplit(px){
+  const max = Math.max(360, ws.clientWidth - 270);   /* keep the preview usable */
+  splitW = Math.round(Math.min(Math.max(px, 340), max));
+  ws.style.gridTemplateColumns = 'minmax(240px,1fr) 6px ' + splitW + 'px';
+}
+splitter.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  splitter.classList.add('dragging');
+  const rect = ws.getBoundingClientRect();
+  const move = ev=>applySplit(rect.right - ev.clientX);
+  const up = ()=>{
+    splitter.classList.remove('dragging');
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    try{ localStorage.setItem('pv.split', String(splitW)); }catch{}
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+});
+try{
+  const saved = parseInt(localStorage.getItem('pv.split'), 10);
+  if(saved >= 340 && saved <= 1600) ws.style.gridTemplateColumns = 'minmax(240px,1fr) 6px ' + saved + 'px';
+}catch{}
+
+loadSample();     /* the sample page is the starting point on load and refresh */
+</script>
+</body>
+</html>
