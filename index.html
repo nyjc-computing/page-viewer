@@ -87,13 +87,19 @@ code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
 .pv-row.pv-sel{background:#123a63;border-left-color:var(--acc)}
 .pv-twist{width:12px;flex:none;color:var(--dim);text-align:center;user-select:none}
 .pv-twist:hover{color:#fff}
-.pv-tag{color:#79c0ff}
-.pv-id{color:#e2b56a}
-.pv-cls{color:#9ecb74}
-.pv-nattr{color:#5b6b85}
-.pv-text{color:#98a3b8}
-.pv-comment{color:#6f7d94;font-style:italic}
-.pv-doctype{color:#d2a8ff}
+/* syntax-lint tokens (each carries a hover tooltip naming the syntax) */
+.tok{border-radius:2px}
+.tok:hover{background:rgba(255,255,255,.09)}
+.tok-lt{color:#6f7d94}
+.tok-tag{color:#79c0ff}
+.tok-an{color:#e2b56a}
+.tok-eq{color:#6f7d94}
+.tok-av{color:#9ecb74}
+.tok-cm{color:#6f7d94;font-style:italic}
+.tok-dt{color:#d2a8ff}
+.pv-text .tok{color:#98a3b8}
+.pv-comment .tok{font-style:italic}
+.pv-doctype .tok{color:#d2a8ff}
 .pv-kids{margin-left:12px;padding-left:2px;border-left:1px dotted #33415e}
 
 /* CSS panel */
@@ -281,7 +287,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <h3>Page Viewer — how to use</h3>
     <ul>
       <li>The <b>sample page</b> loads automatically (and comes back when you reload this tool). To inspect any other page, type its address in the URL bar and click <b>Load page from URL</b> — page scripts are always disabled in the preview.</li>
-      <li><b>Hover</b> rows in the HTML tree to outline the element on the page; hover the page to highlight its row in the tree.</li>
+      <li>The HTML tree shows the raw markup, syntax-linted: tag names, attribute names, values and comments are colour-coded, and hovering any of them (or a text node) shows what kind of HTML syntax it is. Hovering a row outlines the element on the page; hovering the page highlights its row in the tree.</li>
       <li><b>Click</b> an element: it is outlined on the page, its MDN entry loads in the Reference panel, and it is ticked off the H2 Computing checklist (RefG §4).</li>
       <li>In the <b>CSS</b> panel, untick any rule — or a whole stylesheet — to see the page without it. The top section lists the rules that currently match the selected element, most specific first. Blue property names appear in the RefG §6 property list.</li>
       <li>Character references (<code>&amp;amp;</code> <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;quot;</code>) are ticked when you select content that needed them.</li>
@@ -958,18 +964,32 @@ let hoverApi = null;
 /* ============================================================
    DOM TREE
    ============================================================ */
-function attrsHtml(el){
-  const skip = new Set(['id','class','style']);
+/* Syntax-lint tokens: every piece of markup is a labelled span so hovering
+   (native tooltip) shows what kind of HTML syntax it is. innerHtml must be
+   pre-escaped by the caller. */
+const TOK_TITLES = {
+  tag:'Tag name', an:'Attribute name', av:'Attribute value', eq:'Equals sign',
+  lt:'Angle bracket', cm:'HTML comment', tx:'Text content',
+};
+function tokHtml(kind, innerHtml, extraTitle){
+  const title = TOK_TITLES[kind] + (extraTitle ? ' — '+extraTitle : '');
+  return '<span class="tok tok-'+kind+'" title="'+esc(title)+'">'+innerHtml+'</span>';
+}
+
+/* the element's raw markup, fully tokenised — nothing summarised away */
+function attrsRaw(el){
   let h='';
-  if(el.id) h += ' <span class="pv-id">#'+esc(el.id)+'</span>';
-  const cls = pageClasses(el).join('.');
-  if(cls) h += ' <span class="pv-cls">.'+esc(trunc(cls, 44))+'</span>';
-  const others = [...el.attributes].filter(a=>!skip.has(a.name) && !a.name.startsWith('data-pv'));
-  others.slice(0,3).forEach(a=>{
-    const v = a.value.length>26 ? esc(a.value.slice(0,25))+'…' : esc(a.value);
-    h += ' <span class="pv-nattr">'+esc(a.name)+(v?'="'+v+'"':'')+'</span>';
-  });
-  if(others.length>3) h += ' <span class="pv-nattr">+'+(others.length-3)+'</span>';
+  for(const a of el.attributes){
+    if(a.name.startsWith('data-pv')) continue;
+    const bool = a.value === '';
+    h += ' ' + tokHtml('an', esc(a.name), bool ? 'boolean attribute — has no value' : '');
+    if(!bool){
+      const v = a.value;
+      const shown = v.length>110 ? esc(v.slice(0,110))+'…' : esc(v);
+      const extra = v.length>110 ? 'truncated — full value: '+trunc(v,300) : '';
+      h += tokHtml('eq','=') + tokHtml('av', '"'+shown+'"', extra);
+    }
+  }
   return h;
 }
 
@@ -984,7 +1004,11 @@ const tree = {
   build(doc){
     this.reset();
     this._budget = 4000;                       /* rows to auto-expand on huge pages */
-    if(doc.doctype) this.container.appendChild(this.makeSpecialRow('<!doctype html>','pv-doctype','doctype',doc.doctype));
+    if(doc.doctype) this.container.appendChild(this.makeSpecialRow(
+      tokHtml('dt','&lt;!','DOCTYPE declaration — the first line of every HTML document')
+        + tokHtml('tag','!doctype') + tokHtml('dt',' html&gt;'),
+      'DOCTYPE declaration — the first line of every HTML document',
+      'pv-doctype','doctype',doc.doctype));
     this.root = this.makeRow(doc.documentElement);
     this.container.appendChild(this.root.holder);
     this.expandAll(this.root);                 /* fully expanded — nothing hidden from new users */
@@ -999,11 +1023,12 @@ const tree = {
     }
   },
 
-  makeSpecialRow(label, cls, mdnKey, node){
+  makeSpecialRow(innerHtml, title, cls, mdnKey, node){
     const o = {node:node||null, key:mdnKey, built:true, open:false, kids:null, special:true};
     o.holder = document.createElement('div'); o.holder._pv = o;
     o.row = document.createElement('div'); o.row.className='pv-row '+cls;
-    o.row.innerHTML = '<span class="pv-twist"></span><span>'+esc(label)+'</span>';
+    o.row.title = title;
+    o.row.innerHTML = '<span class="pv-twist"></span><span>'+innerHtml+'</span>';
     o.row._pv = o;
     o.holder.appendChild(o.row);
     return o.holder;
@@ -1014,15 +1039,18 @@ const tree = {
     o.holder = document.createElement('div'); o.holder._pv = o;
     o.row = document.createElement('div'); o.row.className='pv-row'; o.row._pv = o;
     if(node.nodeType===1){
+      const tag = esc(node.tagName.toLowerCase());
       o.row.innerHTML = '<span class="pv-twist">'+(twistable(node)?'▸':'')+'</span>'
-        + '<span class="pv-tag">&lt;'+node.tagName.toLowerCase()+'&gt;</span>' + attrsHtml(node);
+        + tokHtml('lt','&lt;') + tokHtml('tag', tag) + attrsRaw(node) + tokHtml('lt','&gt;');
       this.el2row.set(node, o);
     }else if(node.nodeType===3){
       o.row.classList.add('pv-text');
-      o.row.innerHTML = '<span class="pv-twist"></span><span>"'+esc(trunc(node.textContent,90))+'"</span>';
+      o.row.innerHTML = '<span class="pv-twist"></span>'
+        + tokHtml('tx', esc(trunc(node.textContent,120)));
     }else if(node.nodeType===8){
       o.row.classList.add('pv-comment');
-      o.row.innerHTML = '<span class="pv-twist"></span><span>&lt;!--'+esc(trunc(node.textContent,86))+'--&gt;</span>';
+      o.row.innerHTML = '<span class="pv-twist"></span>'
+        + tokHtml('cm', '&lt;!--'+esc(trunc(node.textContent,86))+'--&gt;');
     }
     o.holder.appendChild(o.row);
     return o;
