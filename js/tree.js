@@ -92,15 +92,17 @@ const tree = {
       if(!isVoid){
         const closeTok = tokHtml('lt','&lt;/') + tokHtml('tag', tag) + tokHtml('lt','&gt;');
         if(hasKids){
-          o.row.classList.add('pv-shut');
+          o.row.classList.add('pv-shut');    /* children hidden: show ' … </tag>' inline */
           inlineClose = ' ' + tokHtml('more',' … ') + closeTok;
         }else{
-          inlineClose = ' ' + closeTok;      /* empty element: <div></div> */
+          o.row.classList.add('pv-shut');    /* empty element: <div></div> always */
+          inlineClose = ' ' + closeTok;
         }
       }
+      const markup = tokHtml('lt','&lt;') + tokHtml('tag', tag) + attrsRaw(node)
+        + tokHtml('lt','&gt;') + '<span class="pv-inline-close">'+inlineClose+'</span>';
       o.row.innerHTML = '<span class="pv-twist">'+(hasKids?'▸':'')+'</span>'
-        + tokHtml('lt','&lt;') + tokHtml('tag', tag) + attrsRaw(node) + tokHtml('lt','&gt;')
-        + '<span class="pv-inline-close">'+inlineClose+'</span>';
+        + '<span class="pv-line">'+markup+'</span>';
       this.el2row.set(node, o);
     }else if(node.nodeType===3){
       o.row.classList.add('pv-text');
@@ -122,23 +124,29 @@ const tree = {
       if(n.nodeType===1 || n.nodeType===8 || (n.nodeType===3 && n.textContent.trim()))
         o.kids.appendChild(this.makeRow(n).holder);
     }
-    if(o.node.nodeType===1 && !VOID_ELEMENTS.has(o.node.tagName.toLowerCase())){
+    o.holder.appendChild(o.kids);
+    /* the closing tag sits at the SAME level as the opening tag, after the children */
+    if(!VOID_ELEMENTS.has(o.node.tagName.toLowerCase())){
       const close = document.createElement('div');
       close.className = 'pv-row pv-close-row';
       close._pv = o;
       close.title = 'Closing tag';
       close.innerHTML = '<span class="pv-twist"></span>'
-        + tokHtml('lt','&lt;/') + tokHtml('tag', esc(o.node.tagName.toLowerCase())) + tokHtml('lt','&gt;');
-      o.kids.appendChild(close);
+        + '<span class="pv-line">' + tokHtml('lt','&lt;/')
+        + tokHtml('tag', esc(o.node.tagName.toLowerCase())) + tokHtml('lt','&gt;') + '</span>';
+      o.closeRow = close;
+      o.holder.appendChild(close);
     }
-    o.holder.appendChild(o.kids);
     o.built = true;
   },
 
   expand(o){ if(!o.built) this.buildChildren(o); o.kids.style.display=''; o.open=true;
-             this.twist(o,'▾'); o.row.classList.remove('pv-shut'); },
+             this.twist(o,'▾'); o.row.classList.remove('pv-shut');
+             if(o.closeRow) o.closeRow.style.display=''; },
   collapse(o){ if(o.kids) o.kids.style.display='none'; o.open=false; this.twist(o,'▸');
-               if(o.node.nodeType===1 && o.built) o.row.classList.add('pv-shut'); },
+               if(o.closeRow) o.closeRow.style.display='none';
+               if(o.node.nodeType===1 && o.built && this.hasChildren(o)) o.row.classList.add('pv-shut'); },
+  hasChildren(o){ return !!(o.kids && [...o.kids.children].some(h => h !== o.closeRow)); },
   toggle(o){ o.open ? this.collapse(o) : this.expand(o); },
   twist(o,ch){ const t=o.row.querySelector('.pv-twist'); if(t) t.textContent=ch; },
 
