@@ -22,6 +22,19 @@ $('#btn-css-collapse-all').addEventListener('click', ()=>{
   cssp.render();
 });
 
+/* CSS subpane collapse (collapsed by default) */
+const topRow = $('#top-row');
+const btnCssToggle = $('#btn-css-toggle');
+function setCssOpen(open){
+  topRow.classList.toggle('css-open', open);
+  btnCssToggle.textContent = open ? '– CSS' : '＋ CSS';
+  btnCssToggle.setAttribute('aria-pressed', String(open));
+  btnCssToggle.title = open ? 'Hide the CSS panel' : 'Show the CSS panel';
+  try{ localStorage.setItem('pv.css.open', open ? '1' : '0'); }catch{}
+}
+btnCssToggle.addEventListener('click', ()=>setCssOpen(!topRow.classList.contains('css-open')));
+try{ setCssOpen(localStorage.getItem('pv.css.open')==='1'); }catch{}
+
 /* help dialog */
 const helpDlg = $('#help-dlg');
 $('#btn-help').addEventListener('click', ()=>helpDlg.showModal());
