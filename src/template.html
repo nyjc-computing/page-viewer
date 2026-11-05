@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- GENERATED FILE — built by build.py from src/template.html, css/ and js/. Edit those, then rebuild. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Page Viewer — a DevTools-like DOM inspector for learning HTML and CSS.">
+<title>Page Viewer — HTML &amp; CSS inspector for learners</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<!-- {{STYLES}} -->
+<body>
+
+<header id="topbar">
+  <span id="brand"><code>&lt;/&gt;</code> Page Viewer</span>
+  <input id="url" type="text" value="https://www.nanyangjc.moe.edu.sg/"
+         placeholder="https://www.nanyangjc.moe.edu.sg/"
+         aria-label="Page URL" spellcheck="false">
+  <button id="btn-load" title="Load the URL into the preview">Load page from URL</button>
+  <button id="btn-quest-reset" title="Clear all found quest objectives">Reset Progress</button>
+  <span class="hspacer"></span>
+  <a class="tlink" href="https://isomer-user-content.by.gov.sg/334/fbf2f4ef-108a-4331-8597-a8c71427cc8d/9569_y27_sp_2_RefG.pdf"
+     target="_blank" rel="noopener" title="H2 Computing Reference Guide (§4 HTML, §6 CSS)">RefG ↗</a>
+  <a class="tlink" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements"
+     target="_blank" rel="noopener">MDN ↗</a>
+  <button id="btn-help" title="How to use">?</button>
+</header>
+
+<main id="workspace">
+
+  <section id="preview-pane" class="pane">
+    <div class="pane-h"><span>Preview</span>
+      <span class="hint">hover = locate · click = select · links disabled</span>
+      <span class="hspacer"></span>
+      <button id="btn-reload" title="Reload the current page">⟳ reload</button>
+    </div>
+    <div class="pane-b" id="preview-body">
+      <iframe id="pv-frame" title="Page preview"
+              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div id="quest">
+        <div id="quest-head">
+          <span id="quest-title">⚔ Quest</span>
+          <span id="quest-progress">0 / 28</span>
+          <button id="quest-min" title="Collapse — show only the next objectives">–</button>
+        </div>
+        <div id="quest-bar"><div id="quest-fill"></div></div>
+        <div id="quest-body">
+          <div id="quest-sub">Click elements on the page or in the HTML view to find them.</div>
+          <div id="quest-items"></div>
+          <div id="quest-done-line" hidden>✓ Quest complete — every RefG §4 element found.</div>
+        </div>
+        <button id="quest-expand" title="Expand the quest tracker">＋</button>
+      </div>
+      <div id="load-banner" hidden></div>
+    </div>
+    <div id="statusbar"><span id="st-msg">No page loaded.</span></div>
+  </section>
+
+  <div id="splitter" title="Drag to give more room to either side"></div>
+
+  <aside id="learn" class="pane">
+    <div id="top-row">
+      <div id="html-pane">
+        <div class="pane-h"><span>Hypertext Markup Language (HTML)</span></div>
+        <div class="tools">
+          <input id="tree-find" placeholder="find tag…" size="18" spellcheck="false" title="Find elements by tag name — Enter cycles through matches">
+        </div>
+        <div id="breadcrumb">&nbsp;</div>
+        <div class="pane-b" id="tree"></div>
+      </div>
+      <div id="css-pane">
+        <div class="pane-h"><span>Cascading StyleSheet (CSS)</span><span class="hspacer"></span>
+          <button id="btn-css-collapse-all" title="Collapse every rule to a single line">collapse</button>
+        </div>
+        <div class="pane-b" id="css-body"></div>
+      </div>
+    </div>
+    <div id="learn-row">
+      <div id="mdn-sec">
+        <div id="mdn-head">
+          <span style="font:700 11px system-ui;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">HTML Tag:</span>
+          <span id="mdn-pill" class="none">—</span>
+          <span class="hspacer"></span>
+          <a id="mdn-link" href="#" target="_blank" rel="noopener" hidden>MDN Web Docs reference ↗</a>
+        </div>
+        <div id="mdn-blurb">Click an element in the HTML tree or on the page to read about it.</div>
+        <iframe id="mdn-frame" title="MDN reference content"
+                sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+        <div id="mdn-err"></div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<dialog id="help-dlg">
+  <div class="dlg-body">
+    <h3>Page Viewer — how to use</h3>
+    <ul>
+      <li>The <b>sample page</b> loads automatically (and comes back when you reload this tool). To inspect any other page, type its address in the URL bar and click <b>Load page from URL</b> — page scripts are always disabled in the preview.</li>
+      <li>The HTML tree shows the complete raw markup, pretty-printed and syntax-linted: opening and closing tags, attribute names, values, text and comments are colour-coded, and hovering any of them shows what kind of HTML syntax it is. Hovering a row outlines the element on the page; hovering the page highlights its row in the tree.</li>
+      <li><b>Click</b> an element: it is outlined on the page, its MDN entry loads in the Reference panel, and it completes the matching objective in the <b>quest tracker</b> (top-right of the preview) — find all 28 RefG §4 items to complete the quest. Collapsing the tracker shows just the next three objectives; <b>Reset Progress</b> in the top bar clears it.</li>
+      <li>In the <b>CSS</b> panel, untick any rule — or a whole stylesheet — to see the page without it. The top section lists the rules that currently match the selected element, most specific first. Blue property names appear in the RefG §6 property list.</li>
+      <li>Character references (<code>&amp;amp;</code> <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;quot;</code>) are ticked when you select content that needed them.</li>
+      <li>Progress is saved in this browser until you press <i>reset</i>.</li>
+    </ul>
+    <p style="font-size:11.5px;color:#8b98ad;margin-top:10px">Privacy: pages that cannot be read directly are fetched through a public CORS proxy service, so the URLs you inspect are shared with it — do not inspect pages that need a login. The preview always disables page JavaScript.</p>
+  </div>
+  <div class="dlg-foot"><button id="btn-dlg-close" class="primary">Close</button></div>
+</dialog><!-- {{SCRIPTS}} -->
+</body>
+</html>
