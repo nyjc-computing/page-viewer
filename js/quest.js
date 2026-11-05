@@ -19,9 +19,8 @@ const quest = {
     sub.textContent = 'Click elements on the page (or in the tree) to find them.';
     frag.append(sub);
 
+    /* flat list — no chapter headers (user request) */
     CHECKLIST.forEach(g=>{
-      frag.append(Object.assign(document.createElement('div'),
-        {className:'q-chapter', textContent:g.group}));
       g.items.forEach(([key, desc])=>{
         const row = document.createElement('div');
         row.className='q-item'; row.dataset.key=key;
@@ -33,28 +32,38 @@ const quest = {
         this.items.push({key, entity:!!g.entity, row});
       });
     });
-    this.container = $('#quest-body');
+    this.container = $('#quest-items');
     this.container.append(frag);
 
-    this.container.addEventListener('click', ()=>{});
-    $('#quest-reset').addEventListener('click', ()=>{
+    $('#quest-min').addEventListener('click', e=>{
+      e.stopPropagation();
+      this.setMin(!$('#quest').classList.contains('min'));
+    });
+    $('#quest').addEventListener('click', ()=>{
+      if($('#quest').classList.contains('min')) this.setMin(false);
+    });
+    $('#btn-quest-reset').addEventListener('click', ()=>{
       this.checked.clear(); this.save(); this.updateAll();
-      setStatus('Quest reset — all objectives cleared.');
+      setStatus('Quest progress reset.');
     });
-    $('#quest-min').addEventListener('click', ()=>{
-      const min = $('#quest').classList.toggle('min');
-      $('#quest-badge').hidden = !min;
-      try{ localStorage.setItem('pv.quest.min', min ? '1' : '0'); }catch{}
-    });
-    $('#quest-badge').addEventListener('click', ()=>{
-      $('#quest').classList.remove('min');
-      $('#quest-badge').hidden = true;
-      try{ localStorage.setItem('pv.quest.min', '0'); }catch{}
-    });
-    try{ if(localStorage.getItem('pv.quest.min')==='1'){
-      $('#quest').classList.add('min'); $('#quest-badge').hidden = false; } }catch{}
+    try{ if(localStorage.getItem('pv.quest.min')==='1') this.setMin(true); }catch{}
 
     this.updateAll();
+  },
+
+  setMin(min){
+    $('#quest').classList.toggle('min', min);
+    this.refreshNext();
+    try{ localStorage.setItem('pv.quest.min', min ? '1' : '0'); }catch{}
+  },
+  /* collapsed view: only the next three unfound objectives */
+  refreshNext(){
+    let shown=0;
+    for(const it of this.items){
+      const next = !this.checked.has(it.key) && shown<3;
+      it.row.classList.toggle('q-next', next);
+      if(next) shown++;
+    }
   },
 
   save(){ try{ localStorage.setItem('pv.ck.v1', JSON.stringify([...this.checked])); }catch{} },
@@ -94,7 +103,7 @@ const quest = {
       it.row.classList.add('q-found');
       setTimeout(()=>it.row.classList.remove('q-found'), 900);
       this.scrollTo(it.row);
-      if($('#quest').classList.contains('min')) this.popBadge();
+      this.refreshNext();
     }
     if(this.items.every(i=>this.checked.has(i.key))) {
       $('#quest').classList.add('complete');
@@ -116,24 +125,21 @@ const quest = {
   updateAll(){
     this.items.forEach(it=>this.updateRow(it.row));
     this.progress();
+    this.refreshNext();
     const complete = this.items.length && this.items.every(i=>this.checked.has(i.key));
     $('#quest').classList.toggle('complete', complete);
     if(complete) $('#quest-title').textContent = '⚔ Quest complete!';
     else if($('#quest-title').textContent.startsWith('⚔ Quest complete')) $('#quest-title').textContent = '⚔ Quest: find the HTML elements';
+    $('#quest-done-line').hidden = !(complete && $('#quest').classList.contains('min'));
   },
   progress(){
     const done=this.items.filter(i=>this.checked.has(i.key)).length;
     $('#quest-progress').textContent = done+' / '+this.items.length;
     $('#quest-fill').style.width = (100*done/this.items.length)+'%';
-    $('#quest-badge').textContent = '⚔ '+done+'/'+this.items.length;
   },
   scrollTo(row){
     const c=this.container, top=row.offsetTop;
     if(top < c.scrollTop+4 || top > c.scrollTop + c.clientHeight - 28) c.scrollTop = Math.max(0, top - c.clientHeight/2 + 14);
-  },
-  popBadge(){
-    const b=$('#quest-badge');
-    b.classList.remove('q-pop'); void b.offsetWidth; b.classList.add('q-pop');
   },
 };
 
