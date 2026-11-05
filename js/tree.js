@@ -187,7 +187,7 @@ tree.container.addEventListener('click', e=>{
   }
   if(o.special){                                  /* the doctype row */
     clearSelection(); state.selRow=o; o.row.classList.add('pv-sel');
-    mdn.showFor('doctype'); checklist.tickKey('doctype'); cssp.showMatches(null);
+    mdn.showFor('doctype'); quest.tickKey('doctype'); cssp.showMatches(null);
     return;
   }
   if(o.node.nodeType===1) selectElement(o.node, 'tree');
@@ -239,7 +239,7 @@ function selectElement(el, src){
   if(r){ state.selRow=r; r.row.classList.add('pv-sel'); }
   renderBreadcrumb(el);
   mdn.showFor(el.tagName.toLowerCase());
-  checklist.tickForElement(el);
+  quest.tickForElement(el);
   cssp.showMatches(el);
   if(src!=='page') scrollPreviewTo(el);
 }
@@ -264,7 +264,7 @@ function selectTextNode(o){
   const p = o.node.parentElement;
   renderBreadcrumb(p);
   mdn.showTextHint();
-  checklist.tickForText(o.node.textContent);
+  quest.tickForText(o.node.textContent);
   cssp.showMatches(p);
 }
 

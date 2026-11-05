@@ -28,8 +28,12 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
   compact tag pills. Selecting an element in the tree or on the page ticks it off;
   presence badges (`×4`) show how many of each the current page contains; progress is
   saved in the browser.
-- **Reference** (bottom right) — a local summary for the selected element plus the full
-  MDN article. The articles for the syllabus elements are **bundled in `content/`** and
+- **Quest tracker** (overlay on the preview, bottom-left) — the H2 Computing Reference
+  Guide §4 elements as a gamified find-them quest: click each element on the page or in
+  the tree to complete objectives, with presence counts (`×4`), an XP-style progress
+  bar, and a completion state. Collapses to a small progress badge; progress saves until
+  reset. There is no manual ticking — the only way to complete an objective is to find
+  and select the element. The articles for the syllabus elements are **bundled in `content/`** and
   loaded same-origin, so the panel works offline and on filtered school networks; if an
   article isn't bundled it is fetched from the mdn/content repo (jsDelivr or
   raw.githubusercontent, both CORS-friendly) and finally through the proxy chain. MDN
@@ -50,7 +54,7 @@ js/page.js          page loading: sanitising, stylesheet inlining, preview ifram
 js/tree.js          tokenised DOM tree, hover/click sync, find, breadcrumb
 js/csspanel.js      CSS rule model, per-rule toggles, matched-rules view
 js/mdn.js           reference panel: local blurbs + markdown renderer for the MDN content repo
-js/checklist.js     RefG §4 checklist state and UI
+js/quest.js         quest tracker state and UI (gamified RefG §4 checklist)
 js/main.js          boot: wires everything together, splitter, help dialog
 favicon.svg,        the </> mark (SVG + PNG fallbacks)
 favicon-32.png,
@@ -87,8 +91,8 @@ type its address in the URL bar and click **Load page from URL**:
 - **The cascade, made visible** — load the sample or any page, untick a whole
   stylesheet, then re-enable rules one at a time. The matched-rules panel shows *why* a
   rule wins (specificity chips, order).
-- **Checklist hunt** — "open the school website and tick off every RefG §4 element by
-  finding and clicking it". The `×n` badges hint at what to look for.
+- **The quest** — "open the school website and complete the quest: find every RefG §4
+  element by clicking it". The `×n` badges hint at what to look for.
 
 ## How it works / limitations
 

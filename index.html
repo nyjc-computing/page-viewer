@@ -36,6 +36,20 @@
     <div class="pane-b" id="preview-body">
       <iframe id="pv-frame" title="Page preview"
               sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      <div id="quest">
+        <div id="quest-head">
+          <span id="quest-title">⚔ Quest: find the HTML elements</span>
+          <span id="quest-progress">0 / 28</span>
+          <button id="quest-min" title="Minimize the quest tracker">–</button>
+        </div>
+        <div id="quest-bar"><div id="quest-fill"></div></div>
+        <div id="quest-body"></div>
+        <div id="quest-foot">
+          <span>Click elements on the page (or in the tree) to find them.</span>
+          <button id="quest-reset" title="Untick everything">↺ reset</button>
+        </div>
+      </div>
+      <button id="quest-badge" hidden title="Open the quest tracker">⚔ 0/28</button>
       <div id="load-banner" hidden></div>
     </div>
     <div id="statusbar"><span id="st-msg">No page loaded.</span></div>
@@ -61,14 +75,6 @@
       </div>
     </div>
     <div id="learn-row">
-      <div id="checklist-sec">
-        <div class="pane-h"><span>Checklist</span><span id="ck-progress" style="text-transform:none;letter-spacing:0"></span>
-          <span class="hspacer"></span>
-          <button id="btn-ck-reset" title="Untick everything">reset</button>
-        </div>
-        <div class="pane-b" id="ck-body"></div>
-        <div id="ck-toast" hidden></div>
-      </div>
       <div id="mdn-sec">
         <div id="mdn-head">
           <span style="font:700 11px system-ui;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">HTML Tag:</span>
@@ -92,7 +98,7 @@
     <ul>
       <li>The <b>sample page</b> loads automatically (and comes back when you reload this tool). To inspect any other page, type its address in the URL bar and click <b>Load page from URL</b> — page scripts are always disabled in the preview.</li>
       <li>The HTML tree shows the complete raw markup, pretty-printed and syntax-linted: opening and closing tags, attribute names, values, text and comments are colour-coded, and hovering any of them shows what kind of HTML syntax it is. Hovering a row outlines the element on the page; hovering the page highlights its row in the tree.</li>
-      <li><b>Click</b> an element: it is outlined on the page, its MDN entry loads in the Reference panel, and it is ticked off the H2 Computing checklist (RefG §4).</li>
+      <li><b>Click</b> an element: it is outlined on the page, its MDN entry loads in the Reference panel, and it completes the matching objective in the <b>quest tracker</b> (bottom-left of the preview) — find all 28 RefG §4 items to complete the quest.</li>
       <li>In the <b>CSS</b> panel, untick any rule — or a whole stylesheet — to see the page without it. The top section lists the rules that currently match the selected element, most specific first. Blue property names appear in the RefG §6 property list.</li>
       <li>Character references (<code>&amp;amp;</code> <code>&amp;lt;</code> <code>&amp;gt;</code> <code>&amp;quot;</code>) are ticked when you select content that needed them.</li>
       <li>Progress is saved in this browser until you press <i>reset</i>.</li>
@@ -108,7 +114,7 @@
 <script src="js/tree.js"></script>
 <script src="js/csspanel.js"></script>
 <script src="js/mdn.js"></script>
-<script src="js/checklist.js"></script>
+<script src="js/quest.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

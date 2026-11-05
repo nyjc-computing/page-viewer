@@ -1,11 +1,7 @@
 /* ============================================================
    BOOT — wiring and startup
    ============================================================ */
-
-/* ============================================================
-   BOOT
-   ============================================================ */
-checklist.init();
+quest.init();
 mdn.reset();
 
 $('#btn-load').addEventListener('click', ()=>loadUrl($('#url').value));
@@ -35,6 +31,7 @@ window.addEventListener('error', e=>setStatus('Script error: '+e.message, 'err')
 
 /* draggable divider between preview and panels */
 const ws = $('#workspace');
+const splitter = $('#splitter');
 let splitW = null;
 function applySplit(px){
   const max = Math.max(360, ws.clientWidth - 270);   /* keep the preview usable */

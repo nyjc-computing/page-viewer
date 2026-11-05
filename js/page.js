@@ -141,7 +141,7 @@ frame.addEventListener('load', ()=>{
   injectPageUi(doc);
   tree.build(doc);
   cssp.load(meta.sheets, doc);
-  checklist.scan(meta);
+  quest.scan(meta);
   setStatus('Loaded '+meta.label+' — '+doc.querySelectorAll('*').length+' elements · '+
             meta.sheets.length+' stylesheet'+(meta.sheets.length===1?'':'s')+' · via '+meta.via);
 });
