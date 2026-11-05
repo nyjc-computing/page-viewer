@@ -20,6 +20,7 @@ TEMPLATE = ROOT / "src" / "template.html"
 STYLES = ROOT / "css" / "styles.css"
 SCRIPT_ORDER = [
     "data.js",      # RefG §4 checklist, element blurbs, proxies
+    "articles.js",  # GENERATED bundled MDN articles (scripts/update-mdn-articles.py)
     "sample.js",    # built-in sample page
     "util.js",      # shared helpers
     "fetch.js",     # direct + CORS-proxy fetch pipeline
@@ -32,13 +33,23 @@ SCRIPT_ORDER = [
 ]
 
 
+def js_text(name):
+    """Read a js module and escape '</script' so no string literal or bundled
+    article content can terminate the host <script> block early
+    ('<\\/script' === '</script' as a JavaScript string)."""
+    return (ROOT / "js" / name).read_text(encoding="utf-8").strip().replace(
+        "</script", "<\\/script")
+
+
 def build():
+    if not (ROOT / "js" / "articles.js").exists():
+        print("warning: js/articles.js missing — run scripts/update-mdn-articles.py "
+              "or the Reference panel will fall back to remote fetches")
     template = TEMPLATE.read_text(encoding="utf-8")
     css = STYLES.read_text(encoding="utf-8").strip()
 
     scripts = "\n".join(
-        "<script>\n" + (ROOT / "js" / name).read_text(encoding="utf-8").strip() + "\n</script>"
-        for name in SCRIPT_ORDER
+        "<script>\n" + js_text(name) + "\n</script>" for name in SCRIPT_ORDER
     )
 
     version = time.strftime("%Y%m%d%H%M")

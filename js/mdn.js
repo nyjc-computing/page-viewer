@@ -78,18 +78,23 @@ const mdn = {
         +'The summary above is built in — <a href="'+esc(pageUrl)+'" target="_blank" rel="noopener">open MDN ↗</a>';
     };
     const slug = mdnSlug(key);
+    const flat = slug && slug.split('/').join('--');
     const sources = [];
+    if(flat && typeof MDN_ARTICLES !== 'undefined' && MDN_ARTICLES[flat]){
+      sources.push([null, true]);                       /* embedded article — no fetch */
+    }
     if(slug){
-      sources.push([mdnLocalUrl(slug), true]);
       sources.push([mdnRawUrl(slug, 'https://cdn.jsdelivr.net/gh/mdn/content@main/files/en-us/'), true]);
       sources.push([mdnRawUrl(slug, 'https://raw.githubusercontent.com/mdn/content/main/files/en-us/'), true]);
     }
     sources.push([pageUrl, false]);
     let chain = Promise.reject(new Error('no sources'));
     for(const [u, direct] of sources){
-      chain = chain.catch(() => fetchText(u, direct ? 10000 : 15000, direct ? 1 : 2, direct)
-        .then(r => { const md = u.endsWith('.md'); return md ? mdToHtml(r.text, pageUrl) : extractMdn(r.text, pageUrl); })
-        .then(html => done(html)));
+      chain = chain.catch(() => {
+        if(u === null) return Promise.resolve(mdToHtml(MDN_ARTICLES[flat], pageUrl));
+        return fetchText(u, direct ? 10000 : 15000, direct ? 1 : 2, direct)
+          .then(r => u.endsWith('.md') ? mdToHtml(r.text, pageUrl) : extractMdn(r.text, pageUrl));
+      }).then(html => done(html));
     }
     chain.catch(fail);
   },
@@ -135,7 +140,6 @@ function mdnSlug(key){
   if(/^[a-z0-9-]+$/i.test(key)) return 'web/html/reference/elements/'+key.toLowerCase();
   return null;
 }
-function mdnLocalUrl(slug){ return 'content/'+slug.split('/').join('--')+'.md'; }
 function mdnRawUrl(slug, base){
   return base + slug + '/index.md';
 }
