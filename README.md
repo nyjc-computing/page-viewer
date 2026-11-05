@@ -1,7 +1,9 @@
 # Page Viewer
 
-A DevTools-like **DOM inspector for learning HTML and CSS** — a small static site of
-plain HTML, CSS and JavaScript files. No frameworks, no build step, no dependencies.
+A DevTools-like **DOM inspector for learning HTML and CSS** — plain HTML, CSS and
+JavaScript, no frameworks and no runtime dependencies. The deployable artefact is a
+single self-contained `index.html` (styles and scripts inlined), built from modular
+sources so the code stays easy to maintain.
 
 Students load a web page and see it rendered in a preview pane next to the inspector,
 which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checklist** and
@@ -22,18 +24,14 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
   whole stylesheet and the preview updates live. When an element is selected, the
   top of the panel lists the rules that match it, most specific first. Property names
   that appear in the H2 Computing Reference Guide §6 are shown in blue.
-- **Checklist** (bottom left) — the exact element list from the H2 Computing syllabus
-  Reference Guide §4 (doctype, html/head/title/body, link, h1–h3, p, div, span, hr, b,
-  i, a, img, table/tr/th/td, form/input/textarea, and the four character references) as
-  compact tag pills. Selecting an element in the tree or on the page ticks it off;
-  presence badges (`×4`) show how many of each the current page contains; progress is
-  saved in the browser.
-- **Quest tracker** (overlay on the preview, bottom-left) — the H2 Computing Reference
+- **Quest tracker** (overlay on the preview, top-right) — the H2 Computing Reference
   Guide §4 elements as a gamified find-them quest: click each element on the page or in
   the tree to complete objectives, with presence counts (`×4`), an XP-style progress
-  bar, and a completion state. Collapses to a small progress badge; progress saves until
-  reset. There is no manual ticking — the only way to complete an objective is to find
-  and select the element. The articles for the syllabus elements are **bundled in `content/`** and
+  bar, and a completion state. Collapses to just the next three objectives; progress
+  saves until reset via **Reset Progress** in the top bar. There is no manual ticking —
+  the only way to complete an objective is to find and select the element.
+- **Reference** (bottom right) — a local summary for the selected element plus the full
+  MDN article. The articles for the syllabus elements are **bundled in `content/`** and
   loaded same-origin, so the panel works offline and on filtered school networks; if an
   article isn't bundled it is fetched from the mdn/content repo (jsDelivr or
   raw.githubusercontent, both CORS-friendly) and finally through the proxy chain. MDN
@@ -42,9 +40,9 @@ which is a 2×2 arrangement: **HTML** and **CSS** side by side on top, **Checkli
 ## Project structure
 
 ```
-index.html          markup only; loads the stylesheet and scripts (in dependency order)
-content/            bundled MDN articles (Markdown) for the syllabus elements
-scripts/            update-mdn-content.py — refresh the bundled articles
+index.html          GENERATED single-file app — deploy this, embed this
+build.py            assembles index.html from the sources below
+src/template.html   page markup with {{STYLES}} / {{SCRIPTS}} markers
 css/styles.css      all layout and panel styling
 js/data.js          syllabus content: RefG §4 checklist, element blurbs, proxies
 js/sample.js        the built-in sample page (embedded template)
@@ -56,6 +54,8 @@ js/csspanel.js      CSS rule model, per-rule toggles, matched-rules view
 js/mdn.js           reference panel: local blurbs + markdown renderer for the MDN content repo
 js/quest.js         quest tracker state and UI (gamified RefG §4 checklist)
 js/main.js          boot: wires everything together, splitter, help dialog
+content/            bundled MDN articles (Markdown) for the syllabus elements
+scripts/            update-mdn-content.py — refresh the bundled articles
 favicon.svg,        the </> mark (SVG + PNG fallbacks)
 favicon-32.png,
 apple-touch-icon.png
@@ -64,18 +64,31 @@ apple-touch-icon.png
 Scripts are plain (non-module) files loaded in the order above — cross-file references
 resolve through the shared global scope, so each file is a small, testable unit.
 
+## Development and embedding
+
+Edit the sources (never `index.html` — it is generated), then rebuild:
+
+```
+python build.py
+```
+
+Commit both the sources and the regenerated `index.html`; GitHub Pages serves the
+single file at the site URL. `python build.py --release` additionally writes a dated
+copy (`page-viewer-<date>.html`) for handing to a teacher or embedding elsewhere.
+`python scripts/update-mdn-content.py` refreshes the bundled MDN articles.
+
 ## Running it
 
-Any static server works — there is no build step:
+Any static server works:
 
 ```
 python -m http.server 8000
 # then open http://127.0.0.1:8000/
 ```
 
-Serving over http is recommended (double-clicking the file mostly works, but some
-browsers restrict iframe access from `file:` pages). It can also be embedded in Google
-Sites like any other single-page HTML app.
+The built `index.html` is fully self-contained (styles and scripts inlined), so it can
+also be embedded in Google Sites or handed to a teacher as a single file. Serving over
+http is still recommended — some browsers restrict iframe access from `file:` pages.
 
 ## Loading pages
 
