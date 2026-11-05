@@ -70,7 +70,8 @@ const mdn = {
   },
 
   loadMdn(key, pageUrl){
-    const done = html => { this.cache.set(key, html); if(this.cur===key) this.render(html); };
+    /* return the html so the fallback chain propagates it instead of undefined */
+    const done = html => { this.cache.set(key, html); if(this.cur===key) this.render(html); return html; };
     const fail = e => {
       if(this.cur!==key) return;
       this.failed.set(key, Date.now());
