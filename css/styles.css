@@ -177,9 +177,14 @@ code{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
 #quest-foot span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #quest-foot button{padding:1px 8px;font-size:11px}
 #quest.min{width:236px;cursor:pointer}
-#quest.min #quest-sub,#quest.min .q-chapter,#quest.min .q-item{display:none}
+#quest.min #quest-head,#quest.min #quest-sub,#quest.min .q-chapter,#quest.min .q-item{display:none}
 #quest.min .q-item.q-next{display:flex}
 #quest.min #quest-bar{display:none}
+#quest-expand{display:none;position:absolute;top:4px;right:4px;z-index:6;width:22px;height:22px;
+  padding:0;font-size:14px;line-height:1;color:var(--dim);background:var(--pane2);
+  border:1px solid var(--line);border-radius:5px}
+#quest.min #quest-expand{display:block}
+#quest.min #quest-expand:hover{color:var(--acc);border-color:var(--acc)}
 #quest-done-line{display:none;padding:4px 8px;font:700 12px system-ui;color:var(--green)}
 #quest.min.complete #quest-done-line{display:block}
 

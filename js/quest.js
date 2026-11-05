@@ -14,11 +14,6 @@ const quest = {
     try{ const s=localStorage.getItem('pv.ck.v1'); if(s) this.checked=new Set(JSON.parse(s)); }catch{}
     const frag = document.createDocumentFragment();
 
-    const sub = document.createElement('div');
-    sub.className = 'q-sub';
-    sub.textContent = 'Click elements on the page (or in the tree) to find them.';
-    frag.append(sub);
-
     /* flat list — no chapter headers (user request) */
     CHECKLIST.forEach(g=>{
       g.items.forEach(([key, desc])=>{
@@ -39,6 +34,10 @@ const quest = {
       e.stopPropagation();
       this.setMin(!$('#quest').classList.contains('min'));
     });
+    $('#quest-expand').addEventListener('click', e=>{
+      e.stopPropagation();
+      this.setMin(false);
+    });
     $('#quest').addEventListener('click', ()=>{
       if($('#quest').classList.contains('min')) this.setMin(false);
     });
@@ -53,17 +52,27 @@ const quest = {
 
   setMin(min){
     $('#quest').classList.toggle('min', min);
-    this.refreshNext();
+    this.refreshCollapsed();
     try{ localStorage.setItem('pv.quest.min', min ? '1' : '0'); }catch{}
   },
   /* collapsed view: only the next three unfound objectives */
-  refreshNext(){
+  /* collapsed view: only the next three unfound objectives */
+  refreshCollapsed(){
     let shown=0;
     for(const it of this.items){
       const next = !this.checked.has(it.key) && shown<3;
       it.row.classList.toggle('q-next', next);
       if(next) shown++;
     }
+    const complete = this.items.length && this.items.every(i=>this.checked.has(i.key));
+    $('#quest-done-line').hidden = !(complete && $('#quest').classList.contains('min'));
+  },
+  /* completed objectives sink to the bottom; unfound stay on top in RefG order */
+  reorderFoundToBottom(){
+    const unfound = this.items.filter(it => !this.checked.has(it.key));
+    const found   = this.items.filter(it =>  this.checked.has(it.key));
+    for(const it of unfound) this.container.append(it.row);
+    for(const it of found)   this.container.append(it.row);
   },
 
   save(){ try{ localStorage.setItem('pv.ck.v1', JSON.stringify([...this.checked])); }catch{} },
@@ -103,7 +112,7 @@ const quest = {
       it.row.classList.add('q-found');
       setTimeout(()=>it.row.classList.remove('q-found'), 900);
       this.scrollTo(it.row);
-      this.refreshNext();
+      this.refreshCollapsed();
     }
     if(this.items.every(i=>this.checked.has(i.key))) {
       $('#quest').classList.add('complete');
@@ -124,13 +133,12 @@ const quest = {
   },
   updateAll(){
     this.items.forEach(it=>this.updateRow(it.row));
-    this.progress();
-    this.refreshNext();
+    this.reorderFoundToBottom();
+    this.refreshCollapsed();
     const complete = this.items.length && this.items.every(i=>this.checked.has(i.key));
     $('#quest').classList.toggle('complete', complete);
     if(complete) $('#quest-title').textContent = '⚔ Quest complete!';
-    else if($('#quest-title').textContent.startsWith('⚔ Quest complete')) $('#quest-title').textContent = '⚔ Quest: find the HTML elements';
-    $('#quest-done-line').hidden = !(complete && $('#quest').classList.contains('min'));
+    else if($('#quest-title').textContent.startsWith('⚔ Quest complete')) $('#quest-title').textContent = '⚔ Quest';
   },
   progress(){
     const done=this.items.filter(i=>this.checked.has(i.key)).length;
